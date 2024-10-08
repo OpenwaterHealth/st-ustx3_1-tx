@@ -15,7 +15,7 @@
 
 extern TIM_HandleTypeDef htim3;
 
-uint16_t util_crc16(uint8_t* buf, uint32_t size);
+uint16_t util_crc16(const uint8_t* buf, uint32_t size);
 uint16_t util_hw_crc16(uint8_t* buf, uint32_t size);
 uint8_t crc_test(void);
 void get_unique_identifier(uint32_t* uid);

@@ -95,6 +95,8 @@ void Error_Handler(void);
 #define TX_RESET_L_GPIO_Port GPIOC
 #define THERMISTOR_Pin GPIO_PIN_2
 #define THERMISTOR_GPIO_Port GPIOC
+#define SPI_SCK_Pin GPIO_PIN_5
+#define SPI_SCK_GPIO_Port GPIOA
 #define TX2_SHUTZ_Pin GPIO_PIN_0
 #define TX2_SHUTZ_GPIO_Port GPIOB
 #define TX_CW_EN_Pin GPIO_PIN_6
@@ -105,6 +107,8 @@ void Error_Handler(void);
 #define TX2_CS_GPIO_Port GPIOA
 #define TR8_EN_Pin GPIO_PIN_3
 #define TR8_EN_GPIO_Port GPIOA
+#define SPI_MISO_Pin GPIO_PIN_6
+#define SPI_MISO_GPIO_Port GPIOA
 #define TR2_EN_Pin GPIO_PIN_1
 #define TR2_EN_GPIO_Port GPIOB
 #define TR7_EN_Pin GPIO_PIN_2
@@ -113,6 +117,8 @@ void Error_Handler(void);
 #define TR6_EN_GPIO_Port GPIOB
 #define TX_STDBY_Pin GPIO_PIN_4
 #define TX_STDBY_GPIO_Port GPIOA
+#define SPI_MOSI_Pin GPIO_PIN_7
+#define SPI_MOSI_GPIO_Port GPIOA
 #define TR5_EN_Pin GPIO_PIN_4
 #define TR5_EN_GPIO_Port GPIOC
 #define RDY_Pin GPIO_PIN_5
@@ -121,7 +127,10 @@ void Error_Handler(void);
 #define ESTOP_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-extern CRC_HandleTypeDef   hcrc;
+extern I2C_HandleTypeDef hi2c1;
+extern I2C_HandleTypeDef hi2c2;
+extern CRC_HandleTypeDef hcrc;
+extern SPI_HandleTypeDef hspi1;
 
 /* USER CODE END Private defines */
 
