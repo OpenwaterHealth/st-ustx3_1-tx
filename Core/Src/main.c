@@ -20,8 +20,18 @@
 #include "main.h"
 #include "usb_device.h"
 
+//#define USE_USB2ANY 1
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#ifndef USE_USB2ANY
+#include "i2c_master.h"
+#include "config_CDCE6214_64MHZ.h"
+#endif
+
+#include "utils.h"
+#include <stdio.h>
+#include <stdbool.h>
+#include <string.h>
 
 /* USER CODE END Includes */
 
@@ -82,6 +92,86 @@ static void MX_RTC_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+void SetPinsHighImpedance(void)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // De-initialize the REF_SEL pin
+    HAL_GPIO_DeInit(REFSEL_GPIO_Port, REFSEL_Pin);
+
+    // Configure REF_SEL pin to high impedance (input mode, no pull-up, no pull-down)
+    GPIO_InitStruct.Pin = REFSEL_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(REFSEL_GPIO_Port, &GPIO_InitStruct);
+
+    // De-initialize the HW_SW_CTRL pin
+    HAL_GPIO_DeInit(HW_SW_CTRL_GPIO_Port, HW_SW_CTRL_Pin);
+
+    // Configure HW_SW_CTRL pin to high impedance (input mode, no pull-up, no pull-down)
+    GPIO_InitStruct.Pin = HW_SW_CTRL_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(HW_SW_CTRL_GPIO_Port, &GPIO_InitStruct);
+#if USE_USB2ANY
+// I2C local disable for testing with usb2any
+    GPIO_InitStruct.Pin = LOCAL_SCL_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(LOCAL_SCL_GPIO_Port, &GPIO_InitStruct);
+
+
+    GPIO_InitStruct.Pin = LOCAL_SDA_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(LOCAL_SDA_GPIO_Port, &GPIO_InitStruct);
+}
+#else
+}
+
+static bool ConfigureClock()
+{
+
+  HAL_Delay(25);
+  I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1000);
+  HAL_Delay(25);
+  I2C_write_CDCE6214_reg(0x67, 0x000F, 0x5020);
+  HAL_Delay(25);
+
+  // printf("Configuring Clock chip\r\n");
+  // Calculate the number of elements in the array
+  // blur6214_64mhz_values
+  size_t num_elements = sizeof(cdce6214_v4_64mhz_values) / sizeof(uint32_t);
+
+  // Iterate through the array and split each uint32_t value into two uint16_t values
+  for (size_t i = 0; i < num_elements; i++)
+  {
+    uint32_t value = cdce6214_v4_64mhz_values[i];
+
+    // Split the value into upper and lower words
+    uint16_t reg_addr = (uint16_t)(value >> 16); // Upper word is reg_addr
+    uint16_t reg_value = (uint16_t)value;        // Lower word is reg_value
+
+    // Print the split values
+    if (!I2C_write_CDCE6214_reg(0x67, reg_addr, reg_value))
+    {
+      // printf("failed Index %zu: reg_addr = 0x%04X, reg_value = 0x%04X\r\n", i, reg_addr, reg_value);
+      return false;
+    }
+    HAL_Delay(1);
+  }
+  HAL_Delay(100);
+  I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1110);
+  HAL_Delay(100);
+  I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1100);
+  HAL_Delay(50);
+  I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1000);
+  HAL_Delay(50);
+
+  return true;
+}
+#endif
+
 /* USER CODE END 0 */
 
 /**
@@ -125,7 +215,29 @@ int main(void)
   MX_CRC_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+  // clock chip setup
+
+  HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_SET);
+
+  SetPinsHighImpedance();
+  HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
+
+  HAL_Delay(25);
+
+  HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
+
+  HAL_Delay(25);
+
   HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+
+#ifndef USE_USB2ANY
+  HAL_Delay(25);
+  I2C_scan();
+  ConfigureClock();
+  HAL_Delay(25);
+#endif
+
 
   /* USER CODE END 2 */
 
@@ -136,6 +248,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	HAL_Delay(500);
   }
   /* USER CODE END 3 */
 }
@@ -474,9 +587,9 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 48-1;
+  htim1.Init.Prescaler = 0;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 1000-1;
+  htim1.Init.Period = 24-1;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
@@ -500,7 +613,7 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 500-1;
+  sConfigOC.Pulse = 12;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
@@ -820,6 +933,7 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
+  HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_RESET);
   __disable_irq();
   while (1)
   {

@@ -71,10 +71,14 @@ void Error_Handler(void);
 #define TX1_CS_GPIO_Port GPIOA
 #define TR4_EN_Pin GPIO_PIN_15
 #define TR4_EN_GPIO_Port GPIOC
+#define LOCAL_SCL_Pin GPIO_PIN_8
+#define LOCAL_SCL_GPIO_Port GPIOB
 #define SYSTEM_RDY_Pin GPIO_PIN_2
 #define SYSTEM_RDY_GPIO_Port GPIOD
 #define TX1_SHUTZ_Pin GPIO_PIN_11
 #define TX1_SHUTZ_GPIO_Port GPIOC
+#define LOCAL_SDA_Pin GPIO_PIN_7
+#define LOCAL_SDA_GPIO_Port GPIOB
 #define HW_SW_CTRL_Pin GPIO_PIN_5
 #define HW_SW_CTRL_GPIO_Port GPIOB
 #define INT_Pin GPIO_PIN_10
@@ -113,6 +117,8 @@ void Error_Handler(void);
 #define TR2_EN_GPIO_Port GPIOB
 #define TR7_EN_Pin GPIO_PIN_2
 #define TR7_EN_GPIO_Port GPIOB
+#define GLOBAL_SCL_Pin GPIO_PIN_10
+#define GLOBAL_SCL_GPIO_Port GPIOB
 #define TR6_EN_Pin GPIO_PIN_13
 #define TR6_EN_GPIO_Port GPIOB
 #define TX_STDBY_Pin GPIO_PIN_4
@@ -123,6 +129,8 @@ void Error_Handler(void);
 #define TR5_EN_GPIO_Port GPIOC
 #define RDY_Pin GPIO_PIN_5
 #define RDY_GPIO_Port GPIOC
+#define GLOBAL_SDA_Pin GPIO_PIN_11
+#define GLOBAL_SDA_GPIO_Port GPIOB
 #define ESTOP_Pin GPIO_PIN_12
 #define ESTOP_GPIO_Port GPIOB
 
