@@ -20,13 +20,15 @@
 #include "main.h"
 #include "usb_device.h"
 
-//#define USE_USB2ANY 1
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #ifndef USE_USB2ANY
 #include "i2c_master.h"
 #include "config_CDCE6214_64MHZ.h"
 #endif
+
+#include "tx7332.h"
+#include "demo.h"
 
 #include "utils.h"
 #include <stdio.h>
@@ -69,6 +71,10 @@ UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
+
+TX7332 tx[2];
+//static uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 0};
+//static uint32_t id_words[3] = {0};
 
 /* USER CODE END PV */
 
@@ -238,6 +244,43 @@ int main(void)
   HAL_Delay(25);
 #endif
 
+  // Initializing TX7332
+  HAL_GPIO_WritePin(GPIOC, TX_RESET_L_Pin | TX_CW_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TX_STDBY_GPIO_Port, TX_STDBY_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TR1_EN_GPIO_Port, TR1_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TR2_EN_GPIO_Port, TR2_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TR3_EN_GPIO_Port, TR3_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TR4_EN_GPIO_Port, TR4_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TR5_EN_GPIO_Port, TR5_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TR6_EN_GPIO_Port, TR6_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TR7_EN_GPIO_Port, TR7_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TR8_EN_GPIO_Port, TR8_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, TX1_CS_Pin | TX2_CS_Pin, GPIO_PIN_RESET); // TODO: Verify initial state
+
+  // reset TX7332
+  TX7332_Reset();
+  HAL_Delay(25);
+
+
+  // configure CS for TX7332
+  TX7332_Init(&tx[0], TX1_CS_GPIO_Port, TX1_CS_Pin);
+  TX7332_Init(&tx[1], TX2_CS_GPIO_Port, TX2_CS_Pin);
+  HAL_Delay(10);
+
+  HAL_GPIO_WritePin(TX_CW_EN_GPIO_Port, TX_CW_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TR1_EN_GPIO_Port, TR1_EN_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(TR2_EN_GPIO_Port, TR2_EN_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(TR3_EN_GPIO_Port, TR3_EN_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(TR4_EN_GPIO_Port, TR4_EN_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(TR5_EN_GPIO_Port, TR5_EN_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(TR6_EN_GPIO_Port, TR6_EN_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(TR7_EN_GPIO_Port, TR7_EN_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(TR8_EN_GPIO_Port, TR8_EN_Pin, GPIO_PIN_SET);
+
+  // printf("Writing Demo TX7332 [0] Register Set\r\n");
+  write_demo_registers(&tx[0]);
+  // printf("Writing Demo TX7332 [1] Register Set\r\n");
+  write_demo_registers(&tx[1]);
 
   /* USER CODE END 2 */
 
@@ -545,7 +588,7 @@ static void MX_SPI1_Init(void)
   hspi1.Instance = SPI1;
   hspi1.Init.Mode = SPI_MODE_MASTER;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
@@ -805,24 +848,25 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOF_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOC, TRANSMIT_LED_Pin|TX_RESET_L_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, TR1_EN_Pin|PDN_Pin|REFSEL_Pin|HW_SW_CTRL_Pin
-                          |TR3_EN_Pin|TR2_EN_Pin|TR7_EN_Pin|TR6_EN_Pin, GPIO_PIN_RESET);
+                          |TR3_EN_Pin|TX2_SHUTZ_Pin|TR2_EN_Pin|TR7_EN_Pin
+                          |TR6_EN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, TX1_CS_Pin|TX2_CS_Pin|TR8_EN_Pin|TX_STDBY_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, TX1_CS_Pin|TX2_CS_Pin|TR8_EN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, TR4_EN_Pin|TX_RESET_L_Pin|TX_CW_EN_Pin|TR5_EN_Pin
+  HAL_GPIO_WritePin(GPIOC, TR4_EN_Pin|TX1_SHUTZ_Pin|TX_CW_EN_Pin|TR5_EN_Pin
                           |RDY_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(TX_STDBY_GPIO_Port, TX_STDBY_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pins : PC14 PC12 RX_I2C_SDA_Pin GPIO3_Pin
                            RX_I2C_SCL_Pin PC3 */
@@ -832,28 +876,28 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TRANSMIT_LED_Pin TR4_EN_Pin TX_RESET_L_Pin TX_CW_EN_Pin
-                           TR5_EN_Pin RDY_Pin */
-  GPIO_InitStruct.Pin = TRANSMIT_LED_Pin|TR4_EN_Pin|TX_RESET_L_Pin|TX_CW_EN_Pin
-                          |TR5_EN_Pin|RDY_Pin;
+  /*Configure GPIO pins : TRANSMIT_LED_Pin TR4_EN_Pin TX1_SHUTZ_Pin TX_RESET_L_Pin
+                           TX_CW_EN_Pin TR5_EN_Pin RDY_Pin */
+  GPIO_InitStruct.Pin = TRANSMIT_LED_Pin|TR4_EN_Pin|TX1_SHUTZ_Pin|TX_RESET_L_Pin
+                          |TX_CW_EN_Pin|TR5_EN_Pin|RDY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : TR1_EN_Pin PDN_Pin REFSEL_Pin HW_SW_CTRL_Pin
-                           TR3_EN_Pin TR2_EN_Pin TR7_EN_Pin TR6_EN_Pin */
+                           TR3_EN_Pin TX2_SHUTZ_Pin TR2_EN_Pin TR7_EN_Pin
+                           TR6_EN_Pin */
   GPIO_InitStruct.Pin = TR1_EN_Pin|PDN_Pin|REFSEL_Pin|HW_SW_CTRL_Pin
-                          |TR3_EN_Pin|TR2_EN_Pin|TR7_EN_Pin|TR6_EN_Pin;
+                          |TR3_EN_Pin|TX2_SHUTZ_Pin|TR2_EN_Pin|TR7_EN_Pin
+                          |TR6_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TX1_CS_Pin RST_Pin TX2_CS_Pin TR8_EN_Pin
-                           TX_STDBY_Pin */
-  GPIO_InitStruct.Pin = TX1_CS_Pin|RST_Pin|TX2_CS_Pin|TR8_EN_Pin
-                          |TX_STDBY_Pin;
+  /*Configure GPIO pins : TX1_CS_Pin TX2_CS_Pin TR8_EN_Pin TX_STDBY_Pin */
+  GPIO_InitStruct.Pin = TX1_CS_Pin|TX2_CS_Pin|TR8_EN_Pin|TX_STDBY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -866,29 +910,29 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(SYSTEM_RDY_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TX1_SHUTZ_Pin RX_RDY_Pin */
-  GPIO_InitStruct.Pin = TX1_SHUTZ_Pin|RX_RDY_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
   /*Configure GPIO pin : INT_Pin */
   GPIO_InitStruct.Pin = INT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(INT_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TX2_SHUTZ_Pin POWER_GOOD_Pin */
-  GPIO_InitStruct.Pin = TX2_SHUTZ_Pin|POWER_GOOD_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PA1 */
-  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  /*Configure GPIO pins : RST_Pin PA1 */
+  GPIO_InitStruct.Pin = RST_Pin|GPIO_PIN_1;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : RX_RDY_Pin */
+  GPIO_InitStruct.Pin = RX_RDY_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(RX_RDY_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : POWER_GOOD_Pin */
+  GPIO_InitStruct.Pin = POWER_GOOD_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(POWER_GOOD_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : ESTOP_Pin */
   GPIO_InitStruct.Pin = ESTOP_Pin;
@@ -933,7 +977,7 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-  HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_SET);
   __disable_irq();
   while (1)
   {
