@@ -131,9 +131,9 @@ static int8_t CDC_Init_FS(void);
 static int8_t CDC_DeInit_FS(void);
 static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length);
 static int8_t CDC_Receive_FS(uint8_t* pbuf, uint32_t *Len);
-static int8_t CDC_TransmitCplt_FS(uint8_t *pbuf, uint32_t *Len, uint8_t epnum);
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_DECLARATION */
+static int8_t CDC_TransmitCplt_FS(uint8_t *pbuf, uint32_t *Len, uint8_t epnum);
 
 /* USER CODE END PRIVATE_FUNCTIONS_DECLARATION */
 
@@ -274,8 +274,8 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 
   if(read_to_idle_enabled == 1){
 	  // Restart timer when data is received
-	  HAL_TIM_Base_Stop_IT(&htim15);
-    __HAL_TIM_SET_COUNTER(&htim15, 0); // Reset the timer counter
+	  HAL_TIM_Base_Stop_IT(&htim14);
+    __HAL_TIM_SET_COUNTER(&htim14, 0); // Reset the timer counter
 
 	  if(pRX){
 		  for (uint32_t i = 0; i < len; i++) {
@@ -288,7 +288,7 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 		  }
 	  }
 	  rxIndex = tempHeadPos;
-	  HAL_TIM_Base_Start_IT(&htim15);
+	  HAL_TIM_Base_Start_IT(&htim14);
   }
 
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
@@ -321,6 +321,8 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   return result;
 }
 
+/* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
+
 /**
   * @brief  CDC_TransmitCplt_FS
   *         Data transmitted callback
@@ -345,8 +347,6 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
   return result;
 }
 
-/* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
-
 void CDC_FlushRxBuffer_FS() {
 
 }
@@ -363,7 +363,7 @@ extern void CDC_handle_RxCpltCallback(uint16_t len);
 void CDC_Idle_Timer_Handler()
 {
 	read_to_idle_enabled = 0;
-	HAL_TIM_Base_Stop_IT(&htim15);
+	HAL_TIM_Base_Stop_IT(&htim14);
 
 	if(pRX){
 		// printf("CDC_handle_RxCpltCallback %d \r\n", rxIndex);
