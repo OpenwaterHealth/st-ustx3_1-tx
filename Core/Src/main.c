@@ -29,6 +29,8 @@
 
 #include "tx7332.h"
 #include "demo.h"
+#include "usbd_cdc_if.h"
+#include "uart_comms.h"
 
 #include "utils.h"
 #include <stdio.h>
@@ -73,8 +75,8 @@ UART_HandleTypeDef huart3;
 /* USER CODE BEGIN PV */
 
 TX7332 tx[2];
-//static uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 0};
-//static uint32_t id_words[3] = {0};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 0};
+uint32_t id_words[3] = {0};
 
 /* USER CODE END PV */
 
@@ -92,6 +94,9 @@ static void MX_USART3_UART_Init(void);
 static void MX_CRC_Init(void);
 static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
+
+uint8_t rxBuffer[COMMAND_MAX_SIZE];
+uint8_t txBuffer[COMMAND_MAX_SIZE];
 
 /* USER CODE END PFP */
 
@@ -278,9 +283,13 @@ int main(void)
   HAL_GPIO_WritePin(TR8_EN_GPIO_Port, TR8_EN_Pin, GPIO_PIN_SET);
 
   // printf("Writing Demo TX7332 [0] Register Set\r\n");
-  write_demo_registers(&tx[0]);
+  // write_demo_registers(&tx[0]);
   // printf("Writing Demo TX7332 [1] Register Set\r\n");
-  write_demo_registers(&tx[1]);
+  // write_demo_registers(&tx[1]);
+
+  printf("\r\nController initialize and running\r\n");
+
+  comms_start_task();
 
   /* USER CODE END 2 */
 
@@ -959,6 +968,10 @@ static void MX_GPIO_Init(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
+
+  if (htim->Instance == TIM15) {
+	  CDC_Idle_Timer_Handler();
+  }
 
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM16) {

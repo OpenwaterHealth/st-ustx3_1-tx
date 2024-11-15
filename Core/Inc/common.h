@@ -8,6 +8,15 @@
 #ifndef INC_COMMON_H_
 #define INC_COMMON_H_
 
+#include <stdint.h>
+
+#define COMMAND_MAX_SIZE 2048
+
+typedef enum {
+	OW_START_BYTE = 0xAA,
+	OW_END_BYTE = 0xDD,
+} USTX_ProtocolTypes;
+
 typedef enum {
 	OW_ACK = 0xE0,
 	OW_NAK = 0xE1,
@@ -71,5 +80,15 @@ typedef enum {
 	OW_AFE_ENUM_TX7332 = 0x31,
 } UstxAfeCommands;
 
+typedef struct  {
+	uint16_t id;
+	uint8_t packet_type;
+	uint8_t command;
+	uint8_t addr;
+	uint8_t reserved;
+	uint16_t data_len;
+	uint8_t* data;
+	uint16_t crc;
+} UartPacket;
 
 #endif /* INC_COMMON_H_ */

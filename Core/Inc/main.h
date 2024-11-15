@@ -139,6 +139,7 @@ extern I2C_HandleTypeDef hi2c1;
 extern I2C_HandleTypeDef hi2c2;
 extern CRC_HandleTypeDef hcrc;
 extern SPI_HandleTypeDef hspi1;
+extern TIM_HandleTypeDef htim15;
 
 /* USER CODE END Private defines */
 
