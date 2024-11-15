@@ -689,14 +689,14 @@ static uint8_t  USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
       /* Send ZLP */
       USBD_LL_Transmit(pdev, epnum, NULL, 0U);
 
-      if (((USBD_CDC_ItfTypeDef *)pdev->pClassData)->TransmitCplt != NULL)
-      {
-        ((USBD_CDC_ItfTypeDef *)pdev->pClassData)->TransmitCplt(hcdc->TxBuffer, &hcdc->TxLength, epnum);
-      }
     }
     else
     {
       hcdc->TxState = 0U;
+      if (((USBD_CDC_ItfTypeDef *)pdev->pUserData)->TransmitCplt != NULL)
+      {
+        ((USBD_CDC_ItfTypeDef *)pdev->pUserData)->TransmitCplt(hcdc->TxBuffer, &hcdc->TxLength, epnum);
+      }
     }
     return USBD_OK;
   }

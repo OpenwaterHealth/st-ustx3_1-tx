@@ -88,6 +88,8 @@ UartPacket process_if_command(UartPacket cmd)
 
 	uartResp.id = cmd.id;
 	uartResp.packet_type = OW_RESP;
+	uartResp.addr = 0;
+	uartResp.reserved = 0;
 	uartResp.data_len = 0;
 	uartResp.data = 0;
 	switch (cmd.packet_type)
