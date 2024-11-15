@@ -41,10 +41,10 @@ static void process_basic_command(UartPacket *uartResp, UartPacket cmd)
 		uartResp->command = OW_CMD_NOP;
 		break;
 	case OW_CMD_PING:
-		uartResp->command = OW_CMD_PONG;
+		uartResp->command = OW_CMD_PING;
 		break;
 	case OW_CMD_PONG:
-		uartResp->command = OW_CMD_PING;
+		uartResp->command = OW_CMD_PONG;
 		break;
 	case OW_CMD_VERSION:
 		uartResp->command = OW_CMD_VERSION;
