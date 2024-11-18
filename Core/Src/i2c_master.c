@@ -9,12 +9,12 @@
 #include <stdbool.h>
 #include <string.h>
 
-#define MAX_FOUND_ADDRESSES 5
+//#define MAX_FOUND_ADDRESSES 5
 
 #define I2C_LOCAL_DEVICE hi2c1
 
 uint8_t selected_slave = 0xFF;
-static uint8_t found_address_count = 0;
+uint8_t found_address_count = 0;
 uint8_t found_addresses[MAX_FOUND_ADDRESSES];
 
 void I2C_scan(void)

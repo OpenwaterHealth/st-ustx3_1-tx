@@ -135,6 +135,11 @@ void Error_Handler(void);
 #define ESTOP_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+#define MAX_FOUND_ADDRESSES 10 // Maximum number of found addresses
+
+extern uint8_t found_addresses[]; // Global array to store found addresses
+extern uint8_t found_address_count; // Counter for found addresses
+
 extern I2C_HandleTypeDef hi2c1;
 extern I2C_HandleTypeDef hi2c2;
 extern CRC_HandleTypeDef hcrc;

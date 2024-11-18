@@ -74,6 +74,8 @@ UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
+//--uint8_t found_addresses[MAX_FOUND_ADDRESSES];
+//--uint8_t found_address_count = 0;
 
 TX7332 tx[2];
 uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 0};
