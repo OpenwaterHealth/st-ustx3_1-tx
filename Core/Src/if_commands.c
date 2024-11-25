@@ -10,15 +10,20 @@
 #include "common.h"
 #include "i2c_master.h"
 #include "i2c_protocol.h"
+#include "trigger.h"
 
 #include <stdio.h>
 #include <string.h>
 
 extern uint8_t FIRMWARE_VERSION_DATA[3];
 static uint32_t id_words[3] = {0};
+static char retTriggerJson[0xFF];
 uint8_t receive_afe_status[I2C_STATUS_SIZE] = {0};
 uint8_t receive_afe_buff[I2C_BUFFER_SIZE] = {0};
 uint8_t send_afe_buff[I2C_BUFFER_SIZE] = {0};
+
+static void process_afe_read_status(UartPacket *uartResp, UartPacket cmd);
+static void process_afe_read(UartPacket *uartResp, UartPacket cmd);
 
 static void print_uart_packet(const UartPacket* packet) {
     printf("ID: 0x%04X\r\n", packet->id);
@@ -33,7 +38,33 @@ static void print_uart_packet(const UartPacket* packet) {
     printf("\r\n");
 }
 
-#if 0
+static void process_afe_read(UartPacket *uartResp, UartPacket cmd)
+{
+	uint16_t rx_len =  cmd.command;
+	// I2C_TX_Packet afe_data_packet;
+	uint8_t slave_addr = cmd.addr;
+	if(found_address_count == 0){
+		printf("No AFE's found\r\n");
+		uartResp->id = cmd.id;
+		uartResp->packet_type = OW_ERROR;
+		uartResp->command = cmd.command;
+		return;
+	}else{
+		uartResp->id = cmd.id;
+		uartResp->packet_type = cmd.packet_type;
+		uartResp->command = cmd.command;
+		uartResp->data_len = 0;
+	}
+
+	rx_len = read_data_register_of_slave(slave_addr, receive_afe_buff, rx_len);
+	// printf("Received %d Bytes \r\n", rx_len);
+	// printBuffer(receive_afe_buff, rx_len);
+	uartResp->data_len = rx_len;
+	uartResp->data = receive_afe_buff;
+	//i2c_packet_fromBuffer(receive_afe_buff, &afe_data_packet);
+	// i2c_tx_packet_print(&afe_data_packet);
+}
+
 static void process_basic_command(UartPacket *uartResp, UartPacket cmd)
 {
 	switch (cmd.command)
@@ -117,32 +148,6 @@ static void process_afe_send(UartPacket *uartResp, UartPacket cmd)
 	process_afe_read_status(uartResp, cmd);
 }
 
-static void process_afe_read(UartPacket *uartResp, UartPacket cmd)
-{
-	uint16_t rx_len =  cmd.command;
-	// I2C_TX_Packet afe_data_packet;
-	uint8_t slave_addr = cmd.addr;
-	if(found_address_count == 0){
-		printf("No AFE's found\r\n");
-		uartResp->id = cmd.id;
-		uartResp->packet_type = OW_ERROR;
-		uartResp->command = cmd.command;
-		return;
-	}else{
-		uartResp->id = cmd.id;
-		uartResp->packet_type = cmd.packet_type;
-		uartResp->command = cmd.command;
-		uartResp->data_len = 0;
-	}
-
-	rx_len = read_data_register_of_slave(slave_addr, receive_afe_buff, rx_len);
-	// printf("Received %d Bytes \r\n", rx_len);
-	// printBuffer(receive_afe_buff, rx_len);
-	uartResp->data_len = rx_len;
-	uartResp->data = receive_afe_buff;
-	//i2c_packet_fromBuffer(receive_afe_buff, &afe_data_packet);
-	// i2c_tx_packet_print(&afe_data_packet);
-}
 
 static void process_afe_read_status(UartPacket *uartResp, UartPacket cmd)
 {
@@ -162,11 +167,11 @@ static void process_afe_read_status(UartPacket *uartResp, UartPacket cmd)
 	}
 
 	rx_len = read_status_register_of_slave(slave_addr, receive_afe_status, I2C_STATUS_SIZE);
-	// printf("Received %d Bytes \r\n", rx_len);
+	//printf("Received %d Bytes \r\n", rx_len);
 	uartResp->data_len = rx_len;
 	uartResp->data = receive_afe_status;
 }
-#endif
+
 
 static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 {
@@ -230,14 +235,14 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 			uartResp->addr = cmd.addr;
 			uartResp->reserved = cmd.reserved;
 			uartResp->data_len = 0;
-			//start_trigger_pulse();
+			start_trigger_pulse();
 			break;
 		case OW_CTRL_STOP_SWTRIG:
 			uartResp->command = cmd.command;
 			uartResp->addr = cmd.addr;
 			uartResp->reserved = cmd.reserved;
 			uartResp->data_len = 0;
-			//stop_trigger_pulse();
+			stop_trigger_pulse();
 			break;
 		case OW_CTRL_SET_SWTRIG:
 			uartResp->command = cmd.command;
@@ -245,20 +250,24 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 			uartResp->reserved = cmd.reserved;
 			uartResp->data_len = 0;
 
-			//if(!set_trigger_data((char *)cmd.data, cmd.data_len))
-			//{
-			//	uartResp->packet_type = OW_ERROR;
-			//}
+			if(!set_trigger_data((char *)cmd.data, cmd.data_len))
+			{
+				uartResp->packet_type = OW_ERROR;
+			}
 
 			break;
 		case OW_CTRL_GET_SWTRIG:
 			// refresh state
-			//get_trigger_data(retTriggerJson, 0xFF);
+			if(!get_trigger_data(retTriggerJson, 0xFF))
+			{
+				uartResp->packet_type = OW_ERROR;
+				break;
+			}
 			uartResp->command = cmd.command;
 			uartResp->addr = cmd.addr;
 			uartResp->reserved = cmd.reserved;
-			//uartResp->data_len = strlen(retTriggerJson);
-			//uartResp->data = (uint8_t *)retTriggerJson;
+			uartResp->data_len = strlen(retTriggerJson);
+			uartResp->data = (uint8_t *)retTriggerJson;
 			break;
 		case OW_CMD_RESET:
 			uartResp->command = cmd.command;
@@ -323,23 +332,23 @@ UartPacket process_if_command(UartPacket cmd)
 	switch (cmd.packet_type)
 	{
 	case OW_CMD:
-		//process_basic_command(&uartResp, cmd);
+		process_basic_command(&uartResp, cmd);
 		break;
 	case OW_JSON:
 		//JSON_ProcessCommand(&uartResp, cmd);
 		break;
 	case OW_CONTROLLER:
-		// process by the USTX Controller
+		//process by the USTX Controller
 		CONTROLLER_ProcessCommand(&uartResp, cmd);
 		break;
 	case OW_AFE_STATUS:
-		//process_afe_read_status(&uartResp, cmd);
+		process_afe_read_status(&uartResp, cmd);
 		break;
 	case OW_AFE_READ:
-		//process_afe_read(&uartResp, cmd);
+		process_afe_read(&uartResp, cmd);
 		break;
 	case OW_AFE_SEND:
-		//process_afe_send(&uartResp, cmd);
+		process_afe_send(&uartResp, cmd);
 		break;
 #if 0
 	case OW_I2C_PASSTHRU:

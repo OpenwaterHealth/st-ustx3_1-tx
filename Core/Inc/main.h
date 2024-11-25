@@ -146,6 +146,9 @@ extern CRC_HandleTypeDef hcrc;
 extern SPI_HandleTypeDef hspi1;
 extern TIM_HandleTypeDef htim14;
 
+void OW_TIM15_Init(void);
+void OW_TIM15_DeInit(void);
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -244,7 +244,8 @@ int main(void)
 
   HAL_Delay(25);
 
-  HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_2);
+  init_trigger_pulse(&htim15, TIM_CHANNEL_2);
+
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
 #ifndef USE_USB2ANY
@@ -729,6 +730,17 @@ static void MX_TIM14_Init(void)
 
 }
 
+
+/**
+  * TIM15 Initialization Function for trigger
+  * @param None
+  * @retval None
+  */
+void OW_TIM15_Init()
+{
+	MX_TIM15_Init();
+}
+
 /**
   * @brief TIM15 Initialization Function
   * @param None
@@ -801,7 +813,44 @@ static void MX_TIM15_Init(void)
 
   /* USER CODE END TIM15_Init 2 */
   HAL_TIM_MspPostInit(&htim15);
+}
 
+/**
+  * @brief TIM4 Deinitialization Function for trigger
+  * This function deinitializes the TIM15 used for PWM generation and
+  * reconfigures the associated GPIO pin to a standard output pin with a low state.
+  * @param None
+  * @retval None
+  */
+void OW_TIM15_DeInit(void)
+{
+#if 0 //--
+    /* 1. Stop the PWM generation on TIM15 Channel 2 */
+    if (HAL_TIM_PWM_Stop(&htim15, TIM_CHANNEL_2) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    /* 2. Deinitialize the TIM15 peripheral */
+    if (HAL_TIM_PWM_DeInit(&htim15) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    /* 3. Deinitialize GPIO pin used for TIM15 Channel 2 */
+    HAL_GPIO_DeInit(TRIGGER_GPIO_Port, TRIGGER_Pin);
+
+    /* 4. Reconfigure the GPIO pin as a general output pin */
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = TRIGGER_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(TRIGGER_GPIO_Port, &GPIO_InitStruct);
+
+    /* 5. Set the pin to low */
+    HAL_GPIO_WritePin(TRIGGER_GPIO_Port, TRIGGER_Pin, GPIO_PIN_RESET);
+#endif
 }
 
 /**
@@ -990,6 +1039,8 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+
 
 /* USER CODE END 4 */
 
