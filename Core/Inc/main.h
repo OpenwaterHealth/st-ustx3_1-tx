@@ -105,6 +105,8 @@ void Error_Handler(void);
 #define TX2_SHUTZ_GPIO_Port GPIOB
 #define TX_CW_EN_Pin GPIO_PIN_6
 #define TX_CW_EN_GPIO_Port GPIOC
+#define TRIGGER_Pin GPIO_PIN_15
+#define TRIGGER_GPIO_Port GPIOB
 #define POWER_GOOD_Pin GPIO_PIN_14
 #define POWER_GOOD_GPIO_Port GPIOB
 #define TX2_CS_Pin GPIO_PIN_0
@@ -145,9 +147,7 @@ extern I2C_HandleTypeDef hi2c2;
 extern CRC_HandleTypeDef hcrc;
 extern SPI_HandleTypeDef hspi1;
 extern TIM_HandleTypeDef htim14;
-
-void OW_TIM15_Init(void);
-void OW_TIM15_DeInit(void);
+extern TIM_HandleTypeDef htim15;
 
 /* USER CODE END Private defines */
 
