@@ -29,6 +29,9 @@
 
 #include "tx7332.h"
 #include "demo.h"
+#include "usbd_cdc_if.h"
+#include "uart_comms.h"
+#include "trigger.h"
 
 #include "utils.h"
 #include <stdio.h>
@@ -65,16 +68,19 @@ RTC_HandleTypeDef hrtc;
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim14;
 TIM_HandleTypeDef htim15;
 
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
+//--uint8_t found_addresses[MAX_FOUND_ADDRESSES];
+//--uint8_t found_address_count = 0;
 
 TX7332 tx[2];
-//static uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 0};
-//static uint32_t id_words[3] = {0};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 0};
+uint32_t id_words[3] = {0};
 
 /* USER CODE END PV */
 
@@ -91,7 +97,13 @@ static void MX_USART2_UART_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_CRC_Init(void);
 static void MX_RTC_Init(void);
+static void MX_TIM14_Init(void);
 /* USER CODE BEGIN PFP */
+
+uint8_t rxBuffer[COMMAND_MAX_SIZE];
+uint8_t txBuffer[COMMAND_MAX_SIZE];
+OW_TimerData _timerDataConfig;
+OW_TriggerConfig _triggerConfig;
 
 /* USER CODE END PFP */
 
@@ -220,6 +232,7 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_CRC_Init();
   MX_RTC_Init();
+  MX_TIM14_Init();
   /* USER CODE BEGIN 2 */
   // clock chip setup
 
@@ -234,7 +247,17 @@ int main(void)
 
   HAL_Delay(25);
 
-  HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_2);
+  // setup default
+  _timerDataConfig.TriggerFrequencyHz = 10;
+  _timerDataConfig.TriggerPulseCount = 0; // no pulse count
+  _timerDataConfig.TriggerPulseWidthUsec = 15000;
+  _timerDataConfig.TriggerMode = 0; // continuous
+
+  // configure PWM for trigger pulse
+  init_trigger_pulse(&htim15, TIM_CHANNEL_2);
+  HAL_Delay(1);
+  deinit_trigger_pulse(&htim15, TIM_CHANNEL_2);
+
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
 #ifndef USE_USB2ANY
@@ -278,9 +301,13 @@ int main(void)
   HAL_GPIO_WritePin(TR8_EN_GPIO_Port, TR8_EN_Pin, GPIO_PIN_SET);
 
   // printf("Writing Demo TX7332 [0] Register Set\r\n");
-  write_demo_registers(&tx[0]);
+  // write_demo_registers(&tx[0]);
   // printf("Writing Demo TX7332 [1] Register Set\r\n");
-  write_demo_registers(&tx[1]);
+  // write_demo_registers(&tx[1]);
+
+  printf("\r\nController initialize and running\r\n");
+
+  comms_start_task();
 
   /* USER CODE END 2 */
 
@@ -685,6 +712,37 @@ static void MX_TIM1_Init(void)
 }
 
 /**
+  * @brief TIM14 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM14_Init(void)
+{
+
+  /* USER CODE BEGIN TIM14_Init 0 */
+
+  /* USER CODE END TIM14_Init 0 */
+
+  /* USER CODE BEGIN TIM14_Init 1 */
+
+  /* USER CODE END TIM14_Init 1 */
+  htim14.Instance = TIM14;
+  htim14.Init.Prescaler = 4799;
+  htim14.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim14.Init.Period = 50-1;
+  htim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim14) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM14_Init 2 */
+
+  /* USER CODE END TIM14_Init 2 */
+
+}
+
+/**
   * @brief TIM15 Initialization Function
   * @param None
   * @retval None
@@ -946,6 +1004,8 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+
+
 /* USER CODE END 4 */
 
 /**
@@ -959,6 +1019,10 @@ static void MX_GPIO_Init(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
+
+  if (htim->Instance == TIM14) {
+	  CDC_Idle_Timer_Handler();
+  }
 
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM16) {

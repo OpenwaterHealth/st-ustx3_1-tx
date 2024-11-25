@@ -105,6 +105,8 @@ void Error_Handler(void);
 #define TX2_SHUTZ_GPIO_Port GPIOB
 #define TX_CW_EN_Pin GPIO_PIN_6
 #define TX_CW_EN_GPIO_Port GPIOC
+#define TRIGGER_Pin GPIO_PIN_15
+#define TRIGGER_GPIO_Port GPIOB
 #define POWER_GOOD_Pin GPIO_PIN_14
 #define POWER_GOOD_GPIO_Port GPIOB
 #define TX2_CS_Pin GPIO_PIN_0
@@ -135,10 +137,17 @@ void Error_Handler(void);
 #define ESTOP_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+#define MAX_FOUND_ADDRESSES 10 // Maximum number of found addresses
+
+extern uint8_t found_addresses[]; // Global array to store found addresses
+extern uint8_t found_address_count; // Counter for found addresses
+
 extern I2C_HandleTypeDef hi2c1;
 extern I2C_HandleTypeDef hi2c2;
 extern CRC_HandleTypeDef hcrc;
 extern SPI_HandleTypeDef hspi1;
+extern TIM_HandleTypeDef htim14;
+extern TIM_HandleTypeDef htim15;
 
 /* USER CODE END Private defines */
 
