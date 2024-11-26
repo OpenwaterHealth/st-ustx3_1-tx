@@ -277,6 +277,14 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		    // Reset the board
 		    //NVIC_SystemReset();
 			break;
+		case OW_CMD_ENUM_TX7332:
+			// send array of tx chip counts 0,1,2,3,4,...
+			printf("Enumerate TX7332 ICs %d \r\n", ARRAY_SIZE(tx));
+			uartResp->command = cmd.command;
+			uartResp->addr = cmd.addr;
+			uartResp->reserved = (uint8_t)ARRAY_SIZE(tx);
+			uartResp->data = NULL;
+			break;
 		default:
 			uartResp->addr = 0;
 			uartResp->reserved = 0;
