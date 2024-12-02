@@ -11,17 +11,21 @@
 #include "i2c_master.h"
 #include "i2c_protocol.h"
 #include "trigger.h"
+#include "tx7332.h"
 
 #include <stdio.h>
 #include <string.h>
 
 extern uint8_t FIRMWARE_VERSION_DATA[3];
+extern TX7332 tx[2];
+
 static uint32_t id_words[3] = {0};
 static char retTriggerJson[0xFF];
 uint8_t receive_afe_status[I2C_STATUS_SIZE] = {0};
 uint8_t receive_afe_buff[I2C_BUFFER_SIZE] = {0};
 uint8_t send_afe_buff[I2C_BUFFER_SIZE] = {0};
 
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 static void process_afe_read_status(UartPacket *uartResp, UartPacket cmd);
 static void process_afe_read(UartPacket *uartResp, UartPacket cmd);
 
