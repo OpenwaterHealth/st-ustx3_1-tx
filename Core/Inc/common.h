@@ -50,7 +50,6 @@ typedef enum {
 	OW_CMD_ECHO = 0x03,
 	OW_CMD_TOGGLE_LED = 0x04,
 	OW_CMD_HWID = 0x05,
-	OW_CMD_ENUM_TX7332 = 0x08,
 	OW_CMD_NOP = 0x0E,
 	OW_CMD_RESET = 0x0F,
 } UstxGlobalCommands;
@@ -64,6 +63,9 @@ typedef enum {
 	OW_CTRL_START_SWTRIG = 0x15,
 	OW_CTRL_STOP_SWTRIG = 0x16,
 	OW_CTRL_STATUS_SWTRIG = 0x17,
+	OW_CTRL_SET_HV = 0x18,
+	OW_CTRL_GET_HV = 0x19,
+	OW_CTRL_ENUM_TX7332 = 0x1A,
 } UstxControllerCommands;
 
 typedef enum {
