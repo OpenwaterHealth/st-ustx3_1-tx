@@ -3,6 +3,8 @@
  *
  *  Created on: Nov 15, 2024
  *      Author: GeorgeVigelette
+ *
+ *      added commands 29/11/24 MD
  */
 
 #include "main.h"
@@ -11,19 +13,25 @@
 #include "i2c_master.h"
 #include "i2c_protocol.h"
 #include "trigger.h"
+#include "tx7332.h"
 
 #include <stdio.h>
 #include <string.h>
 
 extern uint8_t FIRMWARE_VERSION_DATA[3];
+extern TX7332 tx[NUMBER_OF_DEVICES];
+
 static uint32_t id_words[3] = {0};
 static char retTriggerJson[0xFF];
 uint8_t receive_afe_status[I2C_STATUS_SIZE] = {0};
 uint8_t receive_afe_buff[I2C_BUFFER_SIZE] = {0};
 uint8_t send_afe_buff[I2C_BUFFER_SIZE] = {0};
 
+uint32_t tx_afe_buff[1];// buffer for data response
+
 static void process_afe_read_status(UartPacket *uartResp, UartPacket cmd);
 static void process_afe_read(UartPacket *uartResp, UartPacket cmd);
+static void process_tx7332_commands(UartPacket *uartResp, UartPacket cmd);
 
 static void print_uart_packet(const UartPacket* packet) {
     printf("ID: 0x%04X\r\n", packet->id);
@@ -36,6 +44,72 @@ static void print_uart_packet(const UartPacket* packet) {
         printf("0x%02X ", packet->data[i]);
     }
     printf("\r\n");
+}
+
+#pragma pack(push,1)
+typedef struct reg_val_t{
+	uint16_t reg_addr;
+	uint32_t reg_val;
+}reg_val_t;
+#pragma pack(pop)
+
+static void process_tx7332_commands(UartPacket *uartResp, UartPacket cmd)
+{
+	uint16_t reg_address = 0;
+	uint32_t reg_value = 0;
+	uint32_t response = 0;
+
+	TX7332* pTX = &tx[FIRST_DEVICE_INDEX];
+
+	uint32_t actual_value = 0;
+
+	switch (cmd.command)
+	{
+		case OW_TX7332_WREG:
+			uartResp->id = cmd.id;
+			uartResp->packet_type = cmd.packet_type;
+			uartResp->command = cmd.command;
+
+			memcpy( &reg_address, cmd.data+REGISTER_ADRESS_OFFSET, sizeof(uint16_t) );
+			memcpy( &reg_value, cmd.data+REGISTER_VALUE_OFFSET, sizeof(uint32_t) );
+
+			TX7332_WriteReg(pTX, reg_address, reg_value);
+
+			break;
+		case OW_TX7332_RREG:
+			memcpy( &reg_address, cmd.data+REGISTER_ADRESS_OFFSET, sizeof(uint16_t) );
+			actual_value = TX7332_ReadReg(pTX, reg_address);
+
+			uartResp->id = cmd.id;
+			uartResp->packet_type = cmd.packet_type;
+			uartResp->command = cmd.command;
+			uartResp->data_len = sizeof(response);
+			memcpy(tx_afe_buff, &actual_value, sizeof(uint32_t));
+			uartResp->data = (uint8_t*)tx_afe_buff;
+			break;
+
+		case OW_TX7332_WBLOCK:
+			size_t Index = 0;
+			uint16_t block_size = 0;
+
+			memcpy( &block_size, cmd.data+REG_BLOCK_SIZE_OFFSET, sizeof(uint16_t) );
+
+			reg_val_t *prv = (reg_val_t*)(cmd.data + REG_BLOCK_ADRESS_OFFSET);
+			reg_val_t rv;
+
+			for(Index = 0; Index < block_size; Index++){
+
+				size_t rvsz = sizeof(reg_val_t);
+				memcpy(&rv, &prv[Index], rvsz);
+				TX7332_WriteReg(pTX, rv.reg_addr, rv.reg_val);
+			}
+
+			uartResp->id = cmd.id;
+			uartResp->packet_type = cmd.packet_type;
+			uartResp->command = cmd.command;
+
+			break;
+	}
 }
 
 static void process_afe_read(UartPacket *uartResp, UartPacket cmd)
@@ -56,9 +130,8 @@ static void process_afe_read(UartPacket *uartResp, UartPacket cmd)
 		uartResp->data_len = 0;
 	}
 
-	rx_len = read_data_register_of_slave(slave_addr, receive_afe_buff, rx_len);
-	// printf("Received %d Bytes \r\n", rx_len);
-	// printBuffer(receive_afe_buff, rx_len);
+	rx_len = read_data_register_of_slave(slave_addr, receive_afe_buff, rx_len);	// printf("Received %d Bytes \r\n", rx_len);
+	// printBuffer(receive_afe_buff, rx_len);;
 	uartResp->data_len = rx_len;
 	uartResp->data = receive_afe_buff;
 	//i2c_packet_fromBuffer(receive_afe_buff, &afe_data_packet);
@@ -171,7 +244,6 @@ static void process_afe_read_status(UartPacket *uartResp, UartPacket cmd)
 	uartResp->data_len = rx_len;
 	uartResp->data = receive_afe_status;
 }
-
 
 static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 {
@@ -349,6 +421,9 @@ UartPacket process_if_command(UartPacket cmd)
 		break;
 	case OW_AFE_SEND:
 		process_afe_send(&uartResp, cmd);
+		break;
+	case OW_TX7332:
+		process_tx7332_commands(&uartResp, cmd);
 		break;
 #if 0
 	case OW_I2C_PASSTHRU:

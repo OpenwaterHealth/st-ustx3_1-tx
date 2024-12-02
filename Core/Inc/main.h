@@ -46,6 +46,17 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
+#define NUMBER_OF_DEVICES 2
+
+#define FIRST_DEVICE_INDEX 0
+#define SECOND_DEVICE_INDEX 1
+
+#define REGISTER_ADRESS_OFFSET 0
+#define REGISTER_VALUE_OFFSET 2
+
+#define REG_BLOCK_SIZE_OFFSET 0
+#define REG_BLOCK_ADRESS_OFFSET 2
+
 
 /* USER CODE END EM */
 
