@@ -331,6 +331,9 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 	uint32_t reg_data_buff[REG_DATA_LEN] = {0};
 	int reg_count = 0;
 
+	uartResp->id = cmd.id;
+	uartResp->command = cmd.command;
+
 	switch (cmd.command)
 	{
 	case OW_TX7332_ENUM:
@@ -433,6 +436,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		memcpy((uint8_t*)reg_data_buff, &cmd.data[4], sizeof(uint32_t) * reg_count);
 		TX7332_WriteBulk(&tx[cmd.addr], reg_address, reg_data_buff, reg_count);
 
+		uartResp->id = cmd.id;
 		uartResp->command = cmd.command;
 		uartResp->addr = 0;
 		uartResp->reserved = 0;
