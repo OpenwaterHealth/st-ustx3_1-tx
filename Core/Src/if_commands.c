@@ -12,12 +12,14 @@
 #include "i2c_protocol.h"
 #include "trigger.h"
 #include "tx7332.h"
+#include "demo.h"
 
 #include <stdio.h>
 #include <string.h>
 
 extern uint8_t FIRMWARE_VERSION_DATA[3];
 extern TX7332 tx[2];
+extern int tx_count;
 
 static uint32_t id_words[3] = {0};
 static char retTriggerJson[0xFF];
@@ -281,14 +283,6 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		    // Reset the board
 		    //NVIC_SystemReset();
 			break;
-		case OW_CTRL_ENUM_TX7332:
-			// send array of tx chip counts 0,1,2,3,4,...
-			printf("Enumerate TX7332 ICs %d \r\n", ARRAY_SIZE(tx));
-			uartResp->command = cmd.command;
-			uartResp->addr = cmd.addr;
-			uartResp->reserved = (uint8_t)ARRAY_SIZE(tx);
-			uartResp->data = NULL;
-			break;
 		default:
 			uartResp->addr = 0;
 			uartResp->reserved = 0;
@@ -330,6 +324,39 @@ static void JSON_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 }
 #endif
 
+static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
+{
+	uint16_t reg_address = 0;
+	uint32_t reg_value = 0;
+	uint32_t response = 0;
+
+	switch (cmd.command)
+	{
+	case OW_TX7332_ENUM:
+		// send array of tx chip counts 0,1,2,3,4,...
+		printf("Enumerate TX7332 ICs %d \r\n", ARRAY_SIZE(tx));
+		uartResp->command = cmd.command;
+		uartResp->addr = cmd.addr;
+		uartResp->reserved = (uint8_t)ARRAY_SIZE(tx);
+		uartResp->data = NULL;
+		break;
+	case OW_TX7332_DEMO:
+		printf("Write Demo to all TX7332 ICs [%d] \r\n", ARRAY_SIZE(tx));
+	    for (int i = 0; i < tx_count; i++) {
+	        write_demo_registers(&tx[i]);
+	    }
+		uartResp->command = cmd.command;
+		uartResp->addr = cmd.addr;
+		uartResp->reserved = (uint8_t)ARRAY_SIZE(tx);
+		uartResp->data = NULL;
+		break;
+	default:
+		uartResp->data_len = 0;
+		uartResp->packet_type = OW_UNKNOWN;
+		break;
+	}
+}
+
 UartPacket process_if_command(UartPacket cmd)
 {
 	UartPacket uartResp;
@@ -353,6 +380,9 @@ UartPacket process_if_command(UartPacket cmd)
 	case OW_CONTROLLER:
 		//process by the USTX Controller
 		CONTROLLER_ProcessCommand(&uartResp, cmd);
+		break;
+	case OW_TX7332:
+		TX7332_ProcessCommand(&uartResp, cmd);
 		break;
 	case OW_AFE_STATUS:
 		process_afe_read_status(&uartResp, cmd);
