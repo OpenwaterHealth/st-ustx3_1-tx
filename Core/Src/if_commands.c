@@ -405,7 +405,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		uartResp->data_len = sizeof(reg_value);;
 		break;
 	case OW_TX7332_WBLOCK:
-		if(cmd.data_len > 6 || cmd.addr >= tx_count){
+		if(cmd.data_len <= 6 || cmd.addr >= tx_count){
 			uartResp->packet_type = OW_ERROR;
 			uartResp->command = cmd.command;
 			uartResp->addr = 0;
