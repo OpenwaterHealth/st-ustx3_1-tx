@@ -12,6 +12,8 @@
 #include "common.h"
 #include "utils.h"
 
+#define REG_DATA_LEN 62
+
 UartPacket process_if_command(UartPacket cmd);
 
 #endif /* INC_IF_COMMANDS_H_ */
