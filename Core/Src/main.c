@@ -28,7 +28,6 @@
 #endif
 
 #include "tx7332.h"
-#include "demo.h"
 #include "usbd_cdc_if.h"
 #include "uart_comms.h"
 #include "trigger.h"
@@ -77,7 +76,7 @@ UART_HandleTypeDef huart3;
 /* USER CODE BEGIN PV */
 //--uint8_t found_addresses[MAX_FOUND_ADDRESSES];
 //--uint8_t found_address_count = 0;
-
+int tx_count = 2;
 TX7332 tx[2];
 uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 0};
 uint32_t id_words[3] = {0};
