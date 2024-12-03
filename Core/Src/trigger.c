@@ -191,6 +191,7 @@ void stop_trigger_pulse()
 		HAL_TIM_PWM_Stop(_triggerConfig.htim , _triggerConfig.channel);
 		updateTimerDataFromPeripheral(_triggerConfig.htim , _triggerConfig.channel);
 		deinit_trigger_pulse(_triggerConfig.htim , _triggerConfig.channel);
+	    HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_SET);
 	}
 }
 
@@ -201,11 +202,15 @@ void start_trigger_pulse()
 	{
 		HAL_TIM_PWM_Start(_triggerConfig.htim , _triggerConfig.channel);
 		updateTimerDataFromPeripheral(_triggerConfig.htim , _triggerConfig.channel);
+
+		HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_RESET);
+
 	}else{
 		init_trigger_pulse(_triggerConfig.htim , _triggerConfig.channel);
 		configureTimer(_triggerConfig.htim, _triggerConfig.channel, _timerDataConfig.TriggerFrequencyHz, _timerDataConfig.TriggerPulseWidthUsec);
 		HAL_TIM_PWM_Start(_triggerConfig.htim , _triggerConfig.channel);
 		updateTimerDataFromPeripheral(_triggerConfig.htim , _triggerConfig.channel);
+		HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_RESET);
 	}
 }
 

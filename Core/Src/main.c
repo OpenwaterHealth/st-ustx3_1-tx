@@ -235,6 +235,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   // clock chip setup
 
+  HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_SET);
 
   SetPinsHighImpedance();
@@ -259,12 +260,10 @@ int main(void)
 
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
-#ifndef USE_USB2ANY
   HAL_Delay(25);
-  I2C_scan();
+  // I2C_scan();
   ConfigureClock();
   HAL_Delay(25);
-#endif
 
   // Initializing TX7332
   HAL_GPIO_WritePin(GPIOC, TX_RESET_L_Pin | TX_CW_EN_Pin, GPIO_PIN_RESET);
@@ -306,6 +305,7 @@ int main(void)
 
   printf("\r\nController initialize and running\r\n");
 
+  HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
   comms_start_task();
 
   /* USER CODE END 2 */
