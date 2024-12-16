@@ -909,15 +909,13 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, TR1_EN_Pin|PDN_Pin|REFSEL_Pin|HW_SW_CTRL_Pin
-                          |TR3_EN_Pin|TX2_SHUTZ_Pin|TR2_EN_Pin|TR7_EN_Pin
-                          |TR6_EN_Pin, GPIO_PIN_RESET);
+                          |TR3_EN_Pin|TR2_EN_Pin|TR7_EN_Pin|TR6_EN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, TX1_CS_Pin|TX2_CS_Pin|TR8_EN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, TR4_EN_Pin|TX1_SHUTZ_Pin|TX_CW_EN_Pin|TR5_EN_Pin
-                          |RDY_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, TR4_EN_Pin|TX_CW_EN_Pin|TR5_EN_Pin|RDY_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
@@ -933,21 +931,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TRANSMIT_LED_Pin TR4_EN_Pin TX1_SHUTZ_Pin TX_RESET_L_Pin
-                           TX_CW_EN_Pin TR5_EN_Pin RDY_Pin */
-  GPIO_InitStruct.Pin = TRANSMIT_LED_Pin|TR4_EN_Pin|TX1_SHUTZ_Pin|TX_RESET_L_Pin
-                          |TX_CW_EN_Pin|TR5_EN_Pin|RDY_Pin;
+  /*Configure GPIO pins : TRANSMIT_LED_Pin TR4_EN_Pin TX_RESET_L_Pin TX_CW_EN_Pin
+                           TR5_EN_Pin RDY_Pin */
+  GPIO_InitStruct.Pin = TRANSMIT_LED_Pin|TR4_EN_Pin|TX_RESET_L_Pin|TX_CW_EN_Pin
+                          |TR5_EN_Pin|RDY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : TR1_EN_Pin PDN_Pin REFSEL_Pin HW_SW_CTRL_Pin
-                           TR3_EN_Pin TX2_SHUTZ_Pin TR2_EN_Pin TR7_EN_Pin
-                           TR6_EN_Pin */
+                           TR3_EN_Pin TR2_EN_Pin TR7_EN_Pin TR6_EN_Pin */
   GPIO_InitStruct.Pin = TR1_EN_Pin|PDN_Pin|REFSEL_Pin|HW_SW_CTRL_Pin
-                          |TR3_EN_Pin|TX2_SHUTZ_Pin|TR2_EN_Pin|TR7_EN_Pin
-                          |TR6_EN_Pin;
+                          |TR3_EN_Pin|TR2_EN_Pin|TR7_EN_Pin|TR6_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -967,6 +963,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(SYSTEM_RDY_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : TX1_SHUTZ_Pin */
+  GPIO_InitStruct.Pin = TX1_SHUTZ_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(TX1_SHUTZ_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : INT_Pin */
   GPIO_InitStruct.Pin = INT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
@@ -984,6 +986,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(RX_RDY_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : TX2_SHUTZ_Pin */
+  GPIO_InitStruct.Pin = TX2_SHUTZ_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(TX2_SHUTZ_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : POWER_GOOD_Pin */
   GPIO_InitStruct.Pin = POWER_GOOD_Pin;
