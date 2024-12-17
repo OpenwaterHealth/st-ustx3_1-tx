@@ -1,4 +1,8 @@
 #MicroXplorer Configuration settings - do not modify
+ADC.ClockPrescaler=ADC_CLOCK_SYNC_PCLK_DIV4
+ADC.ContinuousConvMode=ENABLE
+ADC.IPParameters=ClockPrescaler,ContinuousConvMode,SamplingTime
+ADC.SamplingTime=ADC_SAMPLETIME_28CYCLES_5
 CAD.formats=
 CAD.pinconfig=
 CAD.provider=
@@ -94,6 +98,7 @@ Mcu.UserConstants=
 Mcu.UserName=STM32F072RBHx
 MxCube.Version=6.13.0
 MxDb.Version=DB.6.0.130
+NVIC.ADC1_COMP_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true
 NVIC.ForceEnableDMAVector=true
 NVIC.HardFault_IRQn=true\:0\:0\:false\:false\:true\:false\:false\:false
 NVIC.I2C1_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true

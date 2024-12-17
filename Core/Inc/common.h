@@ -50,6 +50,7 @@ typedef enum {
 	OW_CMD_ECHO = 0x03,
 	OW_CMD_TOGGLE_LED = 0x04,
 	OW_CMD_HWID = 0x05,
+	OW_CMD_GET_TEMP = 0x06,
 	OW_CMD_NOP = 0x0E,
 	OW_CMD_RESET = 0x0F,
 } UstxGlobalCommands;

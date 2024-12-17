@@ -13,6 +13,7 @@
 #include "trigger.h"
 #include "tx7332.h"
 #include "demo.h"
+#include "thermistor.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -23,6 +24,7 @@ extern int tx_count;
 
 static uint32_t id_words[3] = {0};
 static char retTriggerJson[0xFF];
+static float last_temperature = 0;
 uint8_t receive_afe_status[I2C_STATUS_SIZE] = {0};
 uint8_t receive_afe_buff[I2C_BUFFER_SIZE] = {0};
 uint8_t send_afe_buff[I2C_BUFFER_SIZE] = {0};
@@ -225,6 +227,14 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 			id_words[2] = HAL_GetUIDw2();
 			uartResp->data_len = 16;
 			uartResp->data = (uint8_t *)&id_words;
+			break;
+		case OW_CMD_GET_TEMP:
+			last_temperature = Thermistor_ReadTemperature();
+			uartResp->id = cmd.id;
+			uartResp->packet_type = cmd.packet_type;
+			uartResp->command = cmd.command;
+			uartResp->data_len = 4;
+			uartResp->data = (uint8_t *)&last_temperature;
 			break;
 		case OW_CTRL_SCAN_I2C:
 			uartResp->id = cmd.id;
