@@ -39,10 +39,10 @@ static float Thermistor_GetResistance(void)
     uint16_t adcValue = HAL_ADC_GetValue(adcHandle);
 
     // Calculate voltage measured
-    float vMeasured = (adcValue / 4095.0f) * referenceVoltage;
+    float vADC = (referenceVoltage / 4095.0f) * adcValue;
 
     // Calculate thermistor resistance
-    return pullUpResistance * ((referenceVoltage / vMeasured) - 1.0f);
+    return pullUpResistance * (vADC/(referenceVoltage - vADC));
 }
 
 // Read temperature in Celsius
