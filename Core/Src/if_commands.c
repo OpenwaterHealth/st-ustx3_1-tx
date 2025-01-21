@@ -291,6 +291,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 	    for (int i = 0; i < tx_count; i++) {
 	        write_demo_registers(&tx[i]);
 	    }
+
 		uartResp->reserved = (uint8_t)ARRAY_SIZE(tx);
 		break;
 	case OW_TX7332_WREG:

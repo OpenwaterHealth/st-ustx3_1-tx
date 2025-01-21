@@ -464,9 +464,9 @@ void write_demo_registers(TX7332* pT)
 	}
 }
 
-int verify_demo_registers(TX7332* pT)
+bool verify_demo_registers(TX7332* pT)
 {
-	int bSuccess = 1;
+	int bSuccess = true;
 	int num_registers = sizeof(reg_values) / sizeof(reg_values[0]);
 	for (int i = 0; i < num_registers; i++) {
         unsigned int reg_address = reg_values[i][0];
@@ -475,7 +475,7 @@ int verify_demo_registers(TX7332* pT)
 
         if (actual_value != expected_value) {
             //printf("==> Mismatch at index 0x%04X: 0x%08X, 0x%08X\r\n", (uint16_t)reg_address, actual_value, expected_value);
-        	bSuccess = 0;
+        	bSuccess = false;
         }else{
             //printf("Match at index 0x%04X: 0x%08X, 0x%08X\r\n", (uint16_t)reg_address, actual_value, expected_value);
         }
@@ -510,45 +510,4 @@ int verify_test_pattern_registers(TX7332* pT)
         }
 	}
 	return bSuccess;
-}
-
-void write_block_registers(TX7332* pT, uint8_t* data, uint16_t data_len)
-{
-	uint8_t eFlag = 0;
-	int num_values = data_len / 8;
-    // Check if the data contains a valid number of values
-    if (data_len % 8 != 0) {
-        return;
-    }
-    // Loop through the data and convert it into pairs of unsigned int values
-	unsigned int temp_values[num_values][2];
-
-	for (int i = 0; i < num_values; i++) {
-		temp_values[i][0] = (data[i * 8] << 24) | (data[i * 8 + 1] << 16) | (data[i * 8 + 2] << 8) | data[i * 8 + 3];
-		temp_values[i][1] = (data[i * 8 + 4] << 24) | (data[i * 8 + 5] << 16) | (data[i * 8 + 6] << 8) | data[i * 8 + 7];
-	}
-
-    // Now you have temp_values as an array of pairs of unsigned int values
-    // You can compare it against reg_values
-    for (int i = 0; i < num_values; i++) {
-        if (i < sizeof(reg_values) / sizeof(reg_values[0])) {
-            if (temp_values[i][0] == reg_values[i][0] && temp_values[i][1] == reg_values[i][1]) {
-                unsigned int reg_address = (unsigned int)temp_values[i][0];
-                unsigned int expected_value = (unsigned int)temp_values[i][1];
-        		TX7332_WriteReg(pT, reg_address, expected_value);
-            } else {
-                //printf("Mismatch at index %d: %08X, %08X\r\n", i, temp_values[i][0], temp_values[i][1]);
-            	eFlag = 1;
-            }
-        } else {
-            //printf("Data received contains more values than reg_values.\r\n");
-        	eFlag = 1;
-            break;
-        }
-    }
-
-    if(eFlag == 1){
-        //printf("Error flag set.\r\n");
-    	HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_SET);
-    }
 }
