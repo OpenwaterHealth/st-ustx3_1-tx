@@ -70,6 +70,7 @@ SPI_HandleTypeDef hspi1;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim14;
 TIM_HandleTypeDef htim15;
+TIM_HandleTypeDef htim17;
 
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
@@ -79,7 +80,7 @@ UART_HandleTypeDef huart3;
 //--uint8_t found_address_count = 0;
 int tx_count = 2;
 TX7332 tx[2];
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 0};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 1};
 uint32_t id_words[3] = {0};
 
 /* USER CODE END PV */
@@ -98,6 +99,7 @@ static void MX_USART3_UART_Init(void);
 static void MX_CRC_Init(void);
 static void MX_RTC_Init(void);
 static void MX_TIM14_Init(void);
+static void MX_TIM17_Init(void);
 /* USER CODE BEGIN PFP */
 
 uint8_t rxBuffer[COMMAND_MAX_SIZE];
@@ -233,6 +235,7 @@ int main(void)
   MX_CRC_Init();
   MX_RTC_Init();
   MX_TIM14_Init();
+  MX_TIM17_Init();
   /* USER CODE BEGIN 2 */
   // clock chip setup
 
@@ -819,6 +822,38 @@ static void MX_TIM15_Init(void)
 }
 
 /**
+  * @brief TIM17 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM17_Init(void)
+{
+
+  /* USER CODE BEGIN TIM17_Init 0 */
+
+  /* USER CODE END TIM17_Init 0 */
+
+  /* USER CODE BEGIN TIM17_Init 1 */
+
+  /* USER CODE END TIM17_Init 1 */
+  htim17.Instance = TIM17;
+  htim17.Init.Prescaler = 48000-1;
+  htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim17.Init.Period = 1000-1;
+  htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim17.Init.RepetitionCounter = 0;
+  htim17.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim17) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM17_Init 2 */
+
+  /* USER CODE END TIM17_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -1039,6 +1074,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
   /* USER CODE BEGIN Callback 1 */
 
+  if (htim->Instance == TIM17) {
+      // Stop the timer to prevent re-triggering
+      HAL_TIM_Base_Stop_IT(htim);
+
+	  // Reset the board
+	  NVIC_SystemReset();
+  }
   /* USER CODE END Callback 1 */
 }
 

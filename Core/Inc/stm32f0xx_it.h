@@ -54,6 +54,7 @@ void SysTick_Handler(void);
 void ADC1_COMP_IRQHandler(void);
 void TIM14_IRQHandler(void);
 void TIM16_IRQHandler(void);
+void TIM17_IRQHandler(void);
 void I2C1_IRQHandler(void);
 void USB_IRQHandler(void);
 /* USER CODE BEGIN EFP */

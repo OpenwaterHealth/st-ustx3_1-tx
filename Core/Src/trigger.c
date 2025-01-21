@@ -184,34 +184,47 @@ bool get_trigger_data(char *jsonString, size_t max_length)
 	return true;
 }
 
-void stop_trigger_pulse()
+bool stop_trigger_pulse()
 {
+	HAL_StatusTypeDef status = HAL_OK;
+
 	if(_triggerConfig.configured)
 	{
-		HAL_TIM_PWM_Stop(_triggerConfig.htim , _triggerConfig.channel);
+		status = HAL_TIM_PWM_Stop(_triggerConfig.htim , _triggerConfig.channel);
 		updateTimerDataFromPeripheral(_triggerConfig.htim , _triggerConfig.channel);
 		deinit_trigger_pulse(_triggerConfig.htim , _triggerConfig.channel);
 	    HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_SET);
+		if(status != HAL_OK)
+		{
+			return false;
+		}
 	}
+
+	return true;
 }
 
 
-void start_trigger_pulse()
+bool start_trigger_pulse()
 {
+	HAL_StatusTypeDef status = HAL_OK;
+
 	if(_triggerConfig.configured)
 	{
-		HAL_TIM_PWM_Start(_triggerConfig.htim , _triggerConfig.channel);
+		status = HAL_TIM_PWM_Start(_triggerConfig.htim , _triggerConfig.channel);
 		updateTimerDataFromPeripheral(_triggerConfig.htim , _triggerConfig.channel);
-
-		HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_RESET);
-
 	}else{
 		init_trigger_pulse(_triggerConfig.htim , _triggerConfig.channel);
 		configureTimer(_triggerConfig.htim, _triggerConfig.channel, _timerDataConfig.TriggerFrequencyHz, _timerDataConfig.TriggerPulseWidthUsec);
-		HAL_TIM_PWM_Start(_triggerConfig.htim , _triggerConfig.channel);
+		status = HAL_TIM_PWM_Start(_triggerConfig.htim , _triggerConfig.channel);
 		updateTimerDataFromPeripheral(_triggerConfig.htim , _triggerConfig.channel);
-		HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_RESET);
 	}
+	if(status != HAL_OK)
+	{
+		return false;
+	}
+
+	HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_RESET);
+	return true;
 }
 
 bool set_trigger_data(char *jsonString, size_t str_len)

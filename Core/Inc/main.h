@@ -148,6 +148,7 @@ extern CRC_HandleTypeDef hcrc;
 extern SPI_HandleTypeDef hspi1;
 extern TIM_HandleTypeDef htim14;
 extern TIM_HandleTypeDef htim15;
+extern TIM_HandleTypeDef htim17;
 
 /* USER CODE END Private defines */
 
