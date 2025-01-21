@@ -52,7 +52,7 @@ static void process_afe_read(UartPacket *uartResp, UartPacket cmd)
 	// I2C_TX_Packet afe_data_packet;
 	uint8_t slave_addr = cmd.addr;
 	if(found_address_count == 0){
-		printf("No AFE's found\r\n");
+		// printf("No AFE's found\r\n");
 		uartResp->id = cmd.id;
 		uartResp->packet_type = OW_ERROR;
 		uartResp->command = cmd.command;
@@ -85,7 +85,7 @@ static void process_afe_send(UartPacket *uartResp, UartPacket cmd)
 	send_afe_packet.data_len = cmd.data_len;
 
 	if(found_address_count == 0){
-		printf("No AFE's found\r\n");
+		// printf("No AFE's found\r\n");
 		uartResp->id = cmd.id;
 		uartResp->packet_type = OW_ERROR;
 		uartResp->command = cmd.command;
@@ -114,7 +114,7 @@ static void process_afe_read_status(UartPacket *uartResp, UartPacket cmd)
 	uint16_t rx_len = 0;
 	uint8_t slave_addr = cmd.addr;
 	if(found_address_count == 0){
-		printf("No AFE's found\r\n");
+		// printf("No AFE's found\r\n");
 		uartResp->id = cmd.id;
 		uartResp->packet_type = OW_ERROR;
 		uartResp->command = cmd.command;
@@ -275,28 +275,32 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 	{
 	case OW_TX7332_ENUM:
 		// send array of tx chip counts 0,1,2,3,4,...
-		uartResp->command = cmd.command;
+		uartResp->command = OW_TX7332_ENUM;
 		uartResp->addr = cmd.addr;
+		// Here we will have the array for all tx chips with 0,1 on the controller
+		// and 2,3 on the first slave in the chain and so on
 		uartResp->reserved = (uint8_t)ARRAY_SIZE(tx);
+		uartResp->data_len = 0;
 		uartResp->data = NULL;
 		break;
 	case OW_TX7332_DEMO:
+		uartResp->command = OW_TX7332_DEMO;
+		uartResp->data_len = 0;
+		uartResp->data = NULL;
+		uartResp->addr = cmd.addr;
 	    for (int i = 0; i < tx_count; i++) {
 	        write_demo_registers(&tx[i]);
 	    }
-		uartResp->command = cmd.command;
-		uartResp->addr = cmd.addr;
 		uartResp->reserved = (uint8_t)ARRAY_SIZE(tx);
-		uartResp->data = NULL;
 		break;
 	case OW_TX7332_WREG:
+		uartResp->command = OW_TX7332_WREG;
+		uartResp->addr = cmd.addr;
+		uartResp->reserved = 0;
+		uartResp->data_len = 0;
+		uartResp->data = NULL;
 		if(cmd.data_len != 6 || cmd.addr >= tx_count){
 			uartResp->packet_type = OW_ERROR;
-			uartResp->command = cmd.command;
-			uartResp->addr = 0;
-			uartResp->reserved = 0;
-			uartResp->data = NULL;
-			uartResp->data_len = 0;
 			break;
 		}
 
@@ -307,21 +311,15 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 
 		TX7332_WriteReg(&tx[cmd.addr], reg_address, reg_value);
 
-		uartResp->command = cmd.command;
-		uartResp->addr = 0;
-		uartResp->reserved = 0;
-		uartResp->data = NULL;
-		uartResp->data_len = 0;
-
 		break;
 	case OW_TX7332_RREG:
+		uartResp->command = OW_TX7332_RREG;
+		uartResp->addr = cmd.addr;
+		uartResp->reserved = 0;
+		uartResp->data_len = 0;
+		uartResp->data = NULL;
 		if(cmd.data_len != 2 || cmd.addr >= tx_count){
 			uartResp->packet_type = OW_ERROR;
-			uartResp->command = cmd.command;
-			uartResp->addr = 0;
-			uartResp->reserved = 0;
-			uartResp->data = NULL;
-			uartResp->data_len = 0;
 			break;
 		}
 
@@ -335,20 +333,17 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		// Package response
 		reg_data_buff[0] = reg_value;
 
-		uartResp->command = cmd.command;
-		uartResp->addr = cmd.addr;
-		uartResp->reserved = 0;
+		uartResp->data_len = sizeof(reg_value);
 		uartResp->data = (uint8_t*)reg_data_buff;
-		uartResp->data_len = sizeof(reg_value);;
 		break;
 	case OW_TX7332_WBLOCK:
+		uartResp->command = OW_TX7332_WBLOCK;
+		uartResp->addr = cmd.addr;
+		uartResp->reserved = 0;
+		uartResp->data_len = 0;
+		uartResp->data = NULL;
 		if(cmd.data_len <= 6 || cmd.addr >= tx_count){
 			uartResp->packet_type = OW_ERROR;
-			uartResp->command = cmd.command;
-			uartResp->addr = 0;
-			uartResp->reserved = 0;
-			uartResp->data = NULL;
-			uartResp->data_len = 0;
 			break;
 		}
 
@@ -360,10 +355,8 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		// Check if the actual data length matches expected length
 		if(cmd.data_len != (4 + (4 * reg_count)))
 		{
-			printf("Invalid data size does not match \r\n");
+			// printf("Invalid data size does not match \r\n");
 			uartResp->packet_type = OW_ERROR;
-			uartResp->data = NULL;
-			uartResp->data_len = 0;
 			break;
 		}
 
@@ -371,17 +364,68 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
 
 		memcpy((uint8_t*)reg_data_buff, &cmd.data[4], sizeof(uint32_t) * reg_count);
-		TX7332_WriteBulk(&tx[cmd.addr], reg_address, reg_data_buff, reg_count);
-
-		uartResp->id = cmd.id;
-		uartResp->command = cmd.command;
-		uartResp->addr = 0;
+		if(!TX7332_WriteBulk(&tx[cmd.addr], reg_address, reg_data_buff, reg_count)){
+			uartResp->packet_type = OW_ERROR;
+			break;
+		}
+		break;
+	case OW_TX7332_VWREG:
+		uartResp->command = OW_TX7332_VWREG;
+		uartResp->addr = cmd.addr;
 		uartResp->reserved = 0;
-		uartResp->data = NULL;
 		uartResp->data_len = 0;
+		uartResp->data = NULL;
+		if(cmd.data_len != 6 || cmd.addr >= tx_count){
+			uartResp->packet_type = OW_ERROR;
+			break;
+		}
+
+		// Unpack 16-bit address (first 2 bytes, little-endian)
+		reg_address = cmd.data[0] | (cmd.data[1] << 8);
+		// Unpack 32-bit value (next 4 bytes, little-endian)
+		reg_value = cmd.data[2] | (cmd.data[3] << 8) | (cmd.data[4] << 16) | (cmd.data[5] << 24);
+
+		if(!TX7332_WriteVerify(&tx[cmd.addr], reg_address, reg_value))
+		{
+			uartResp->packet_type = OW_ERROR;
+		}
+
+		break;
+	case OW_TX7332_VWBLOCK:
+		uartResp->command = OW_TX7332_VWBLOCK;
+		uartResp->addr = cmd.addr;
+		uartResp->reserved = 0;
+		uartResp->data_len = 0;
+		uartResp->data = NULL;
+		if(cmd.data_len <= 6 || cmd.addr >= tx_count){
+			uartResp->packet_type = OW_ERROR;
+			break;
+		}
+
+		// Unpack 16-bit address (first 2 bytes, little-endian)
+		reg_address = cmd.data[0] | (cmd.data[1] << 8);
+		// Unpack 16-bit address (first 2 bytes, little-endian)
+		reg_count = cmd.data[2];
+		// byte [3] dummy byte
+		// Check if the actual data length matches expected length
+		if(cmd.data_len != (4 + (4 * reg_count)))
+		{
+			// printf("Invalid data size does not match \r\n");
+			uartResp->packet_type = OW_ERROR;
+			break;
+		}
+
+
+		memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
+
+		memcpy((uint8_t*)reg_data_buff, &cmd.data[4], sizeof(uint32_t) * reg_count);
+		if(!TX7332_WriteBulkVerify(&tx[cmd.addr], reg_address, reg_data_buff, reg_count)){
+			uartResp->packet_type = OW_ERROR;
+			break;
+		}
 		break;
 	case OW_TX7332_RESET:
-		uartResp->command = cmd.command;
+		uartResp->command = OW_TX7332_RESET;
 		uartResp->addr = 0;
 		uartResp->reserved = 0;
 		uartResp->data = NULL;

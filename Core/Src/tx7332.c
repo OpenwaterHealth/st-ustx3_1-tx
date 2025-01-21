@@ -107,7 +107,17 @@ bool TX7332_WriteVerify(TX7332* device, uint16_t addr, uint32_t val){
 	return TX7332_ReadReg(device, addr) == val;
 }
 
-void TX7332_WriteBulk(TX7332* device, uint16_t addr, uint32_t* pInts, int len) {
+bool TX7332_WriteBulk(TX7332* device, uint16_t addr, uint32_t* pInts, int len) {
+	HAL_StatusTypeDef status = HAL_OK;
+
+    // Validate parameters
+    if (device == NULL || pInts == NULL) {
+        return false;
+    }
+    if (len <= 0) {
+        return false;
+    }
+
     if (len > 1) {
         TX7332_WriteReg(device, 0, BURST_WR_EN);
     }
@@ -118,16 +128,28 @@ void TX7332_WriteBulk(TX7332* device, uint16_t addr, uint32_t* pInts, int len) {
     for (int i = 0; i < len; ++i) {
     	uint32_t val = *(pInts + i);
         uint32_t swap_val = SwapEndian(val);
-        HAL_SPI_Transmit(spi_, (uint8_t*)&swap_val, 4, HAL_MAX_DELAY);
+        status = HAL_SPI_Transmit(spi_, (uint8_t*)&swap_val, 4, HAL_MAX_DELAY);
+        if(status != HAL_OK){
+        	break;
+        }
     }
 
     HAL_GPIO_WritePin(device->cs_port, device->cs_pin, GPIO_PIN_SET);
+    // Check final status
+    if (status == HAL_OK) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 bool TX7332_WriteBulkVerify(TX7332* device, uint16_t addr, uint32_t* be_bytes, int len)
 {
     // Write the data in bulk
-    TX7332_WriteBulk(device, addr, be_bytes, len);
+    if(!TX7332_WriteBulk(device, addr, be_bytes, len))
+    {
+    	return false;
+    }
 
     // Verify each written value
     for (int i = 0; i < len; ++i) {
