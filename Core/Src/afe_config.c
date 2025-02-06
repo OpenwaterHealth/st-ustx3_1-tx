@@ -9,6 +9,7 @@
 
 
 
+
 void loadDeviceConfig(DeviceConfig_t *config)
 {
 	// F072 doesn't have an eeprom need to rework this and use flash

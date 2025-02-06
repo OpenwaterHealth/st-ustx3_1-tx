@@ -81,3 +81,22 @@ uint32_t fnv1a_32(const uint8_t *data, size_t len) {
 
     return hash;
 }
+
+void printBuffer(const uint8_t* buffer, uint32_t size) {
+    for (uint32_t i = 0; i < size; i++) {
+        // Print byte in hexadecimal format
+        printf("%02X ", buffer[i]);
+
+        // Add a newline after every 16 bytes
+        if ((i + 1) % 16 == 0) {
+            printf("\r\n");
+        }
+    }
+
+    // Ensure final newline if the buffer size is not a multiple of 16
+    if (size % 16 != 0) {
+        printf("\r\n");
+    }
+
+    printf("\r\n");
+}

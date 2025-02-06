@@ -77,10 +77,14 @@ void Error_Handler(void);
 #define SYSTEM_RDY_GPIO_Port GPIOD
 #define TX1_SHUTZ_Pin GPIO_PIN_11
 #define TX1_SHUTZ_GPIO_Port GPIOC
+#define CALL_OUT_Pin GPIO_PIN_10
+#define CALL_OUT_GPIO_Port GPIOC
 #define LOCAL_SDA_Pin GPIO_PIN_7
 #define LOCAL_SDA_GPIO_Port GPIOB
 #define HW_SW_CTRL_Pin GPIO_PIN_5
 #define HW_SW_CTRL_GPIO_Port GPIOB
+#define LD_HB_Pin GPIO_PIN_12
+#define LD_HB_GPIO_Port GPIOC
 #define INT_Pin GPIO_PIN_10
 #define INT_GPIO_Port GPIOA
 #define RST_Pin GPIO_PIN_9
@@ -99,6 +103,8 @@ void Error_Handler(void);
 #define TX_RESET_L_GPIO_Port GPIOC
 #define THERMISTOR_Pin GPIO_PIN_2
 #define THERMISTOR_GPIO_Port GPIOC
+#define CALL_IN_Pin GPIO_PIN_2
+#define CALL_IN_GPIO_Port GPIOA
 #define SPI_SCK_Pin GPIO_PIN_5
 #define SPI_SCK_GPIO_Port GPIOA
 #define TX2_SHUTZ_Pin GPIO_PIN_0

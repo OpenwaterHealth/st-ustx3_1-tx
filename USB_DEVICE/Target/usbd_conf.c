@@ -26,6 +26,7 @@
 #include "usbd_cdc.h"
 
 /* USER CODE BEGIN Includes */
+#include "uart_comms.h"
 
 /* USER CODE END Includes */
 
@@ -198,6 +199,11 @@ void HAL_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
   USBD_LL_Suspend((USBD_HandleTypeDef*)hpcd->pData);
   /* Enter in STOP mode. */
   /* USER CODE BEGIN 2 */
+  if(get_device_role() == ROLE_MASTER)
+  {
+	demote_to_slave();
+  }
+
   if (hpcd->Init.low_power_enable)
   {
     /* Set SLEEPDEEP bit and SleepOnExit of Cortex System Control Register. */
@@ -219,6 +225,11 @@ void HAL_PCD_ResumeCallback(PCD_HandleTypeDef *hpcd)
 #endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
 {
   /* USER CODE BEGIN 3 */
+  if(get_device_role() != ROLE_MASTER)
+  {
+	promote_to_master();
+  }
+
   if (hpcd->Init.low_power_enable)
   {
     /* Reset SLEEPDEEP bit of Cortex System Control Register. */

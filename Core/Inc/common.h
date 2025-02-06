@@ -18,6 +18,12 @@ typedef enum {
 } USTX_ProtocolTypes;
 
 typedef enum {
+    ROLE_UNDEFINED,
+    ROLE_MASTER,
+    ROLE_SLAVE
+} DEVICE_ROLE;
+
+typedef enum {
 	OW_ACK = 0xE0,
 	OW_NAK = 0xE1,
 	OW_CMD = 0xE2,

@@ -9,11 +9,12 @@
 #define INC_AFE_CONFIG_H_
 
 #include "main.h"
+#include "common.h"
 #include <stdint.h>
-
 
 // Configuration structure
 typedef struct {
+    uint8_t tx7332_id;
     uint8_t i2c_address;
     // Add more configuration parameters if needed
 } DeviceConfig_t;

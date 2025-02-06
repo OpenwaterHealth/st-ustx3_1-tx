@@ -47,6 +47,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define TOGGLE_INTERVAL 500  // Toggle every 500ms
 
 /* USER CODE END PD */
 
@@ -74,6 +75,10 @@ TIM_HandleTypeDef htim17;
 
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
+DMA_HandleTypeDef hdma_usart2_rx;
+DMA_HandleTypeDef hdma_usart2_tx;
+DMA_HandleTypeDef hdma_usart3_rx;
+DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
 //--uint8_t found_addresses[MAX_FOUND_ADDRESSES];
@@ -88,6 +93,7 @@ uint32_t id_words[3] = {0};
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_ADC_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_I2C2_Init(void);
@@ -202,6 +208,8 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+  uint32_t last_toggle_time = HAL_GetTick(); // Store the initial time
+  uint32_t current_time = 0;
 
   /* USER CODE END 1 */
 
@@ -223,6 +231,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_ADC_Init();
   MX_I2C1_Init();
   MX_I2C2_Init();
@@ -311,10 +320,10 @@ int main(void)
   // printf("Writing Demo TX7332 [1] Register Set\r\n");
   // write_demo_registers(&tx[1]);
 
-  printf("\r\nController initialize and running\r\n");
-
   HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
-  comms_start_task();
+
+  // start listen
+  comms_start();
 
   /* USER CODE END 2 */
 
@@ -325,7 +334,13 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	HAL_Delay(500);
+	current_time = HAL_GetTick(); // Get current time
+	comms_check_received(); // check comms
+    if ((current_time - last_toggle_time) >= TOGGLE_INTERVAL) {
+        HAL_GPIO_TogglePin(LD_HB_GPIO_Port, LD_HB_Pin); // Toggle LED
+        last_toggle_time = current_time; // Update the last toggle time
+    }
+
   }
   /* USER CODE END 3 */
 }
@@ -842,7 +857,7 @@ static void MX_TIM17_Init(void)
   htim17.Init.Period = 1000-1;
   htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim17.Init.RepetitionCounter = 0;
-  htim17.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  htim17.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim17) != HAL_OK)
   {
     Error_Handler();
@@ -869,7 +884,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 38400;
+  huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -904,7 +919,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 38400;
+  huart3.Init.BaudRate = 115200;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
@@ -920,6 +935,25 @@ static void MX_USART3_UART_Init(void)
   /* USER CODE BEGIN USART3_Init 2 */
 
   /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel2_3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
+  /* DMA1_Channel4_5_6_7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel4_5_6_7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel4_5_6_7_IRQn);
 
 }
 
@@ -942,7 +976,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOF_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, TRANSMIT_LED_Pin|TX_RESET_L_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOC, TRANSMIT_LED_Pin|LD_HB_Pin|TX_RESET_L_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, TR1_EN_Pin|PDN_Pin|REFSEL_Pin|HW_SW_CTRL_Pin
@@ -960,18 +994,18 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(TX_STDBY_GPIO_Port, TX_STDBY_Pin, GPIO_PIN_SET);
 
-  /*Configure GPIO pins : PC14 PC12 RX_I2C_SDA_Pin GPIO3_Pin
-                           RX_I2C_SCL_Pin PC3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_14|GPIO_PIN_12|RX_I2C_SDA_Pin|GPIO3_Pin
-                          |RX_I2C_SCL_Pin|GPIO_PIN_3;
+  /*Configure GPIO pins : PC14 RX_I2C_SDA_Pin GPIO3_Pin RX_I2C_SCL_Pin
+                           PC3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_14|RX_I2C_SDA_Pin|GPIO3_Pin|RX_I2C_SCL_Pin
+                          |GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TRANSMIT_LED_Pin TR4_EN_Pin TX_RESET_L_Pin TX_CW_EN_Pin
-                           TR5_EN_Pin RDY_Pin */
-  GPIO_InitStruct.Pin = TRANSMIT_LED_Pin|TR4_EN_Pin|TX_RESET_L_Pin|TX_CW_EN_Pin
-                          |TR5_EN_Pin|RDY_Pin;
+  /*Configure GPIO pins : TRANSMIT_LED_Pin TR4_EN_Pin LD_HB_Pin TX_RESET_L_Pin
+                           TX_CW_EN_Pin TR5_EN_Pin RDY_Pin */
+  GPIO_InitStruct.Pin = TRANSMIT_LED_Pin|TR4_EN_Pin|LD_HB_Pin|TX_RESET_L_Pin
+                          |TX_CW_EN_Pin|TR5_EN_Pin|RDY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
