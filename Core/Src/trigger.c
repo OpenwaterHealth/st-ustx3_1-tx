@@ -17,8 +17,6 @@ extern OW_TriggerConfig _triggerConfig;
 
 
 static void OW_TIM15_Init(void);
-static void OW_TIM15_DeInit(void);
-
 
 static void updateTimerDataFromPeripheral(TIM_HandleTypeDef *htim, uint32_t channel)
 {
@@ -258,7 +256,7 @@ bool set_trigger_data(char *jsonString, size_t str_len)
   * @param None
   * @retval None
   */
-static void OW_TIM15_DeInit(void)
+void OW_TIM15_DeInit(void)
 {
     /* USER CODE BEGIN TIM15_DeInit 0 */
 

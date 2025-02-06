@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 
-#define COMMAND_MAX_SIZE 2048
+#define COMMAND_MAX_SIZE 256
 
 typedef enum {
 	OW_START_BYTE = 0xAA,

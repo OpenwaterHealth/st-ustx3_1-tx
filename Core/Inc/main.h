@@ -156,6 +156,9 @@ extern TIM_HandleTypeDef htim14;
 extern TIM_HandleTypeDef htim15;
 extern TIM_HandleTypeDef htim17;
 
+extern UART_HandleTypeDef huart2;
+extern UART_HandleTypeDef huart3;
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

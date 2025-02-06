@@ -29,6 +29,7 @@ typedef struct {
     bool configured;
 } OW_TriggerConfig;
 
+void OW_TIM15_DeInit(void);
 void init_trigger_pulse(TIM_HandleTypeDef* htim, uint32_t channel);
 void deinit_trigger_pulse(TIM_HandleTypeDef* htim, uint32_t channel);
 bool start_trigger_pulse();

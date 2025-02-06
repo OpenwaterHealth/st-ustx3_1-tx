@@ -108,8 +108,6 @@ static void MX_TIM14_Init(void);
 static void MX_TIM17_Init(void);
 /* USER CODE BEGIN PFP */
 
-uint8_t rxBuffer[COMMAND_MAX_SIZE];
-uint8_t txBuffer[COMMAND_MAX_SIZE];
 OW_TimerData _timerDataConfig;
 OW_TriggerConfig _triggerConfig;
 
@@ -246,37 +244,41 @@ int main(void)
   MX_TIM14_Init();
   MX_TIM17_Init();
   /* USER CODE BEGIN 2 */
-  // clock chip setup
 
   HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_SET);
 
+  HAL_Delay(250); // wait for role to be set if connected to usb
+
+  // Initialize thermistor library
+  Thermistor_Start(&hadc, 2.5f, 10000.0f);
+
+  // clock chip setup
   SetPinsHighImpedance();
   HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
-
-  HAL_Delay(25);
-
-  HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
-
   HAL_Delay(25);
 
   // setup default
+  OW_TIM15_DeInit();
   _timerDataConfig.TriggerFrequencyHz = 10;
   _timerDataConfig.TriggerPulseCount = 0; // no pulse count
   _timerDataConfig.TriggerPulseWidthUsec = 15000;
   _timerDataConfig.TriggerMode = 0; // continuous
 
-  // configure PWM for trigger pulse
-  init_trigger_pulse(&htim15, TIM_CHANNEL_2);
-  HAL_Delay(1);
-  deinit_trigger_pulse(&htim15, TIM_CHANNEL_2);
+  if(get_device_role()==ROLE_MASTER){
+	  // configure PWM for trigger pulse
+	  init_trigger_pulse(&htim15, TIM_CHANNEL_2);
+	  HAL_Delay(1);
+	  deinit_trigger_pulse(&htim15, TIM_CHANNEL_2);
 
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+	  // 2MHz reference signal
+	  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  }
 
-  HAL_Delay(25);
+  HAL_Delay(5);
   // I2C_scan();
   ConfigureClock();
-  HAL_Delay(25);
+  HAL_Delay(5);
 
   // Initializing TX7332
   HAL_GPIO_WritePin(GPIOC, TX_RESET_L_Pin | TX_CW_EN_Pin, GPIO_PIN_RESET);
@@ -291,14 +293,9 @@ int main(void)
   HAL_GPIO_WritePin(TR8_EN_GPIO_Port, TR8_EN_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(GPIOA, TX1_CS_Pin | TX2_CS_Pin, GPIO_PIN_RESET); // TODO: Verify initial state
 
-
-  // Initialize thermistor library
-  Thermistor_Start(&hadc, 2.5f, 10000.0f);
-
   // reset TX7332
   TX7332_Reset();
   HAL_Delay(25);
-
 
   // configure CS for TX7332
   TX7332_Init(&tx[0], TX1_CS_GPIO_Port, TX1_CS_Pin);
@@ -315,15 +312,15 @@ int main(void)
   HAL_GPIO_WritePin(TR7_EN_GPIO_Port, TR7_EN_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TR8_EN_GPIO_Port, TR8_EN_Pin, GPIO_PIN_SET);
 
-  // printf("Writing Demo TX7332 [0] Register Set\r\n");
-  // write_demo_registers(&tx[0]);
-  // printf("Writing Demo TX7332 [1] Register Set\r\n");
-  // write_demo_registers(&tx[1]);
-
-  HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
-
   // start listen
-  comms_start();
+  if(get_device_role()==ROLE_MASTER){
+	   comms_host_start();
+  }else{
+	  comms_onewire_slave_start();
+  }
+
+  // system entering ready state
+  HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
 
   /* USER CODE END 2 */
 
@@ -335,7 +332,9 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	current_time = HAL_GetTick(); // Get current time
-	comms_check_received(); // check comms
+	if(get_device_role()==ROLE_MASTER){
+		comms_host_check_received(); // check comms
+	}
     if ((current_time - last_toggle_time) >= TOGGLE_INTERVAL) {
         HAL_GPIO_TogglePin(LD_HB_GPIO_Port, LD_HB_Pin); // Toggle LED
         last_toggle_time = current_time; // Update the last toggle time
@@ -1082,7 +1081,22 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+	if (huart->Instance == USART2) {
+		comms_handle_ow_RxEventCallback(huart, Size);
+	}
+}
 
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
+	if (huart->Instance == USART2) {
+		comms_handle_ow_TxCpltCallback(huart);
+	}
+}
 
 /* USER CODE END 4 */
 

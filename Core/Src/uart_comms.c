@@ -13,12 +13,15 @@
 #include "usbd_cdc_if.h"
 
 // Private variables
-extern uint8_t rxBuffer[COMMAND_MAX_SIZE];
-extern uint8_t txBuffer[COMMAND_MAX_SIZE];
+uint8_t rxBuffer[COMMAND_MAX_SIZE];
+uint8_t txBuffer[COMMAND_MAX_SIZE];
+uint8_t owBuffer[COMMAND_MAX_SIZE];
 
 volatile uint32_t ptrReceive;
 volatile uint8_t rx_flag = 0;
 volatile uint8_t tx_flag = 0;
+volatile uint8_t rx_ow_flag = 0;
+volatile uint8_t tx_ow_flag = 0;
 static DEVICE_ROLE my_device_role = ROLE_UNDEFINED;
 
 static void comms_interface_send(UartPacket* pResp)
@@ -52,7 +55,7 @@ static void comms_interface_send(UartPacket* pResp)
 	while(!tx_flag);
 }
 
-void comms_start(void)
+void comms_host_start(void)
 {
 
 	memset(rxBuffer, 0, sizeof(rxBuffer));
@@ -67,7 +70,7 @@ void comms_start(void)
 
 }
 
-void comms_check_received(void)
+void comms_host_check_received(void)
 {
 	UartPacket cmd;
 	UartPacket resp;
@@ -164,118 +167,35 @@ NextDataPacket:
 	CDC_ReceiveToIdle(rxBuffer, COMMAND_MAX_SIZE);
 }
 
-// This is the FreeRTOS task
-void comms_start_task() {
+void comms_onewire_master_start(void)
+{
 
-	memset(rxBuffer, 0, sizeof(rxBuffer));
-	ptrReceive = 0;
+}
 
-	CDC_FlushRxBuffer_FS();
+bool comms_onewire_slave_start()
+{
+	memset(owBuffer, 0, sizeof(owBuffer));
+    rx_ow_flag = 0;
+    tx_ow_flag = 0;
 
-	UartPacket cmd;
-	UartPacket resp;
-    uint16_t calculated_crc;
-    rx_flag = 0;
-    tx_flag = 0;
-    while(1) {
-    	CDC_ReceiveToIdle(rxBuffer, COMMAND_MAX_SIZE);
-		while(!rx_flag);
-
-        int bufferIndex = 0;
-
-        if(rxBuffer[bufferIndex++] != OW_START_BYTE) {
-            // Send NACK doesn't have the correct start byte
-        	resp.id = OW_CMD_NOP;
-            resp.data_len = 0;
-            resp.packet_type = OW_NAK;
-            goto NextDataPacket;
-        }
-
-        cmd.id = (rxBuffer[bufferIndex] << 8 | (rxBuffer[bufferIndex+1] & 0xFF ));
-        bufferIndex+=2;
-        cmd.packet_type = rxBuffer[bufferIndex++];
-        cmd.command = rxBuffer[bufferIndex++];
-        cmd.addr = rxBuffer[bufferIndex++];
-        cmd.reserved = rxBuffer[bufferIndex++];
-
-        // Extract payload length
-        cmd.data_len = (rxBuffer[bufferIndex] << 8 | (rxBuffer[bufferIndex+1] & 0xFF ));
-        bufferIndex+=2;
-
-        // Check if data length is valid
-        if (cmd.data_len > COMMAND_MAX_SIZE - bufferIndex && rxBuffer[COMMAND_MAX_SIZE-1] != OW_END_BYTE) {
-            // Send NACK response due to no end byte
-        	// data can exceed buffersize but every buffer must have a start and end packet
-        	// command that will send more data than one buffer will follow with data packets to complete the request
-        	resp.id = cmd.id;
-        	resp.addr = 0;
-        	resp.reserved = 0;
-            resp.data_len = 0;
-            resp.packet_type = OW_NAK;
-            goto NextDataPacket;
-        }
-
-        // Extract data pointer
-        cmd.data = &rxBuffer[bufferIndex];
-        if (cmd.data_len > COMMAND_MAX_SIZE)
-        {
-        	bufferIndex=COMMAND_MAX_SIZE-3; // [3 bytes from the end should be the crc for a continuation packet]
-        }else{
-        	bufferIndex += cmd.data_len; // move pointer to end of data
-        }
-
-        // Extract received CRC
-        cmd.crc = (rxBuffer[bufferIndex] << 8 | (rxBuffer[bufferIndex+1] & 0xFF ));
-        bufferIndex+=2;
-
-        // Calculate CRC for received data
-
-        if (cmd.data_len > COMMAND_MAX_SIZE)
-        {
-        	calculated_crc = util_crc16(&rxBuffer[1], COMMAND_MAX_SIZE-3);
-        }
-        else
-        {
-        	calculated_crc = util_crc16(&rxBuffer[1], cmd.data_len + 8);
-        }
-
-        // Check CRC
-        if (cmd.crc != calculated_crc) {
-            // Send NACK response due to bad CRC
-        	resp.id = cmd.id;
-        	resp.addr = 0;
-        	resp.reserved = 0;
-            resp.data_len = 0;
-            resp.packet_type = OW_BAD_CRC;
-            goto NextDataPacket;
-        }
-
-        // Check end byte
-        if (rxBuffer[bufferIndex++] != OW_END_BYTE) {
-        	resp.id = cmd.id;
-            resp.data_len = 0;
-        	resp.addr = 0;
-        	resp.reserved = 0;
-            resp.packet_type = OW_NAK;
-            goto NextDataPacket;
-        }
-
-		resp = process_if_command(cmd);
-
-NextDataPacket:
-		comms_interface_send(&resp);
-		memset(rxBuffer, 0, sizeof(rxBuffer));
-		ptrReceive=0;
-		rx_flag = 0;
+    if(HAL_HalfDuplex_EnableReceiver(&huart2) != HAL_OK) {
+    	// Receive Error
+		Error_Handler();
     }
 
+	if (HAL_UARTEx_ReceiveToIdle_IT(&huart2, owBuffer, COMMAND_MAX_SIZE) != HAL_OK) {
+		// Receive Error
+		Error_Handler();
+	}
+
+	return true;
 }
 
 DEVICE_ROLE get_device_role()
 {
 	return my_device_role;
 }
-;
+
 bool promote_to_master()
 {
 	bool bRet = false;
@@ -285,6 +205,7 @@ bool promote_to_master()
 	}
 	// configure master
 	my_device_role = ROLE_MASTER;
+	HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
 	return bRet;
 }
 
@@ -300,6 +221,7 @@ bool demote_to_slave()
 	}
 	// configure slave
 	my_device_role = ROLE_SLAVE;
+	HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_SET);
 	return bRet;
 }
 
@@ -309,6 +231,22 @@ void comms_handle_RxCpltCallback(UART_HandleTypeDef *huart, uint16_t pos) {
     if (huart->Instance == USART1) {
         // Notify the task
     	rx_flag = 1;
+    }
+}
+
+void comms_handle_ow_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size) {
+
+    if (huart->Instance == USART2) {
+        // Notify the task
+    	rx_ow_flag = 1;
+    }
+}
+
+void comms_handle_ow_TxCpltCallback(UART_HandleTypeDef *huart) {
+
+    if (huart->Instance == USART2) {
+        // Notify the task
+    	tx_ow_flag = 1;
     }
 }
 

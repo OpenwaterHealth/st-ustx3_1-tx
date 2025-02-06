@@ -13,11 +13,14 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-void comms_start(void);
-void comms_check_received(void);
-void comms_start_task(void);
+void comms_host_start(void);
+void comms_host_check_received(void);
+void comms_onewire_master_start(void);
+bool comms_onewire_slave_start(void);
 void comms_handle_RxCpltCallback(UART_HandleTypeDef *huart, uint16_t Size);
 void comms_handle_TxCallback(UART_HandleTypeDef *huart);
+void comms_handle_ow_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size);
+void comms_handle_ow_TxCpltCallback(UART_HandleTypeDef *huart);
 void CDC_handle_TxCpltCallback();
 
 DEVICE_ROLE get_device_role();
