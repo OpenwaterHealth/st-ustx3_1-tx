@@ -314,7 +314,8 @@ int main(void)
 
   // start listen
   if(get_device_role()==ROLE_MASTER){
-	   comms_host_start();
+	  set_module_ID(0);
+	  comms_host_start();
   }else{
 	  comms_onewire_slave_start();
   }
@@ -1084,7 +1085,9 @@ static void MX_GPIO_Init(void)
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
 	if (huart->Instance == USART2) {
-		comms_handle_ow_RxEventCallback(huart, Size);
+		comms_handle_ow_slave_RxEventCallback(huart, Size);
+	}else if (huart->Instance == USART3){
+		comms_handle_ow_master_RxEventCallback(huart, Size);
 	}
 }
 
@@ -1094,7 +1097,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
 	if (huart->Instance == USART2) {
-		comms_handle_ow_TxCpltCallback(huart);
+		comms_handle_ow_slave_TxCpltCallback(huart);
+	}else if (huart->Instance == USART3){
+		comms_handle_ow_master_TxCpltCallback(huart);
 	}
 }
 

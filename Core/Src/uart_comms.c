@@ -12,6 +12,8 @@
 #include <string.h>
 #include "usbd_cdc_if.h"
 
+#define ONEWIRE_TIMEOUT 250
+
 // Private variables
 uint8_t rxBuffer[COMMAND_MAX_SIZE];
 uint8_t txBuffer[COMMAND_MAX_SIZE];
@@ -20,20 +22,26 @@ uint8_t owBuffer[COMMAND_MAX_SIZE];
 volatile uint32_t ptrReceive;
 volatile uint8_t rx_flag = 0;
 volatile uint8_t tx_flag = 0;
-volatile uint8_t rx_ow_flag = 0;
-volatile uint8_t tx_ow_flag = 0;
+volatile uint8_t rx_ow_slave_flag = 0;
+volatile uint8_t tx_ow_slave_flag = 0;
+volatile uint8_t rx_ow_master_flag = 0;
+volatile uint8_t tx_ow_master_flag = 0;
+volatile uint16_t ow_packetid = 0;
+
+static uint8_t module_ID = 0;
+
 static DEVICE_ROLE my_device_role = ROLE_UNDEFINED;
 
 static void comms_interface_send(UartPacket* pResp)
 {
 	// while (HAL_UART_GetState(&huart1) == HAL_UART_STATE_BUSY_TX);
-	memset(txBuffer, 0, sizeof(txBuffer));
+	memset(owBuffer, 0, sizeof(owBuffer));
 	int bufferIndex = 0;
 
 	txBuffer[bufferIndex++] = OW_START_BYTE;
 	txBuffer[bufferIndex++] = pResp->id >> 8;
 	txBuffer[bufferIndex++] = pResp->id & 0xFF;
-	txBuffer[bufferIndex++] = pResp->packet_type;
+	txBuffer[bufferIndex++] = OW_RESP;
 	txBuffer[bufferIndex++] = pResp->command;
 	txBuffer[bufferIndex++] = pResp->addr;
 	txBuffer[bufferIndex++] = pResp->reserved;
@@ -51,8 +59,65 @@ static void comms_interface_send(UartPacket* pResp)
 	txBuffer[bufferIndex++] = OW_END_BYTE;
 
 	CDC_Transmit_FS(txBuffer, bufferIndex);
-	// HAL_UART_Transmit_DMA(&huart1, txBuffer, bufferIndex);
+
 	while(!tx_flag);
+}
+
+static bool comms_onewire_master_send(uint8_t tx_id, uint8_t cmd, uint8_t *pData, uint16_t data_len)
+{
+    uint32_t start_time = HAL_GetTick();  // Get the current time
+	memset(txBuffer, 0, sizeof(txBuffer));
+	ow_packetid++;
+	if(ow_packetid==0){
+		ow_packetid = 1;
+	}
+
+	int bufferIndex = 0;
+
+	owBuffer[bufferIndex++] = OW_START_BYTE;
+	owBuffer[bufferIndex++] = ow_packetid >> 8;
+	owBuffer[bufferIndex++] = ow_packetid & 0xFF;
+	owBuffer[bufferIndex++] = OW_ONE_WIRE;
+	owBuffer[bufferIndex++] = cmd;
+	owBuffer[bufferIndex++] = tx_id;  // transmiter module ID
+	owBuffer[bufferIndex++] = 0;
+	owBuffer[bufferIndex++] = data_len >> 8;
+	owBuffer[bufferIndex++] = data_len & 0xFF;
+	if(data_len > 0)
+	{
+		memcpy(&owBuffer[bufferIndex], pData, data_len);
+		bufferIndex += data_len;
+	}
+	uint16_t crc = util_crc16(&owBuffer[1], data_len + 8);
+	owBuffer[bufferIndex++] = crc >> 8;
+	owBuffer[bufferIndex++] = crc & 0xFF;
+
+	tx_ow_master_flag = 0;
+
+	if (HAL_HalfDuplex_EnableTransmitter(&huart3) != HAL_OK) {
+        // Setup Error
+        Error_Handler();
+	}
+    if (HAL_UART_Transmit_IT(&huart3, (uint8_t *)owBuffer, bufferIndex) != HAL_OK) {
+        // Transmission Error
+        Error_Handler();
+    }
+
+    while(!tx_ow_master_flag){
+        if ((HAL_GetTick() - start_time) >= ONEWIRE_TIMEOUT) {  // Check if 100ms have passed
+            return false;  // Timeout occurred
+        }
+    }
+
+    return true;
+}
+
+void set_module_ID(uint8_t id) {
+    module_ID = id;
+}
+
+uint8_t get_module_ID() {
+    return module_ID;
 }
 
 void comms_host_start(void)
@@ -167,7 +232,7 @@ NextDataPacket:
 	CDC_ReceiveToIdle(rxBuffer, COMMAND_MAX_SIZE);
 }
 
-void comms_onewire_master_start(void)
+void comms_onewire_enum_slaves(void)
 {
 
 }
@@ -175,8 +240,8 @@ void comms_onewire_master_start(void)
 bool comms_onewire_slave_start()
 {
 	memset(owBuffer, 0, sizeof(owBuffer));
-    rx_ow_flag = 0;
-    tx_ow_flag = 0;
+    rx_ow_slave_flag = 0;
+    tx_ow_slave_flag = 0;
 
     if(HAL_HalfDuplex_EnableReceiver(&huart2) != HAL_OK) {
     	// Receive Error
@@ -234,19 +299,36 @@ void comms_handle_RxCpltCallback(UART_HandleTypeDef *huart, uint16_t pos) {
     }
 }
 
-void comms_handle_ow_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size) {
-
+void comms_handle_ow_slave_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
+{
     if (huart->Instance == USART2) {
         // Notify the task
-    	rx_ow_flag = 1;
+    	rx_ow_slave_flag = 1;
     }
 }
 
-void comms_handle_ow_TxCpltCallback(UART_HandleTypeDef *huart) {
-
+void comms_handle_ow_slave_TxCpltCallback(UART_HandleTypeDef *huart)
+{
     if (huart->Instance == USART2) {
         // Notify the task
-    	tx_ow_flag = 1;
+    	tx_ow_slave_flag = 1;
+    }
+}
+
+
+void comms_handle_ow_master_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
+{
+    if (huart->Instance == USART3) {
+        // Notify the task
+    	rx_ow_master_flag = 1;
+    }
+}
+
+void comms_handle_ow_master_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART3) {
+        // Notify the task
+    	tx_ow_master_flag = 1;
     }
 }
 

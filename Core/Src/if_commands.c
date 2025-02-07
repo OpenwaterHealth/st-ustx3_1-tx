@@ -453,8 +453,8 @@ UartPacket process_if_command(UartPacket cmd)
 	uartResp.data = 0;
 	switch (cmd.packet_type)
 	{
-	case OW_JSON:
-		//JSON_ProcessCommand(&uartResp, cmd);
+	case OW_ONE_WIRE:
+		//OW_ONE_WIRE_ProcessCommand(&uartResp, cmd);
 		break;
 	case OW_CMD:
 	case OW_CONTROLLER:
