@@ -17,8 +17,6 @@ void comms_host_start(void);
 void comms_host_check_received(void);
 void comms_onewire_enum_slaves(void);
 bool comms_onewire_slave_start(void);
-void comms_handle_RxCpltCallback(UART_HandleTypeDef *huart, uint16_t Size);
-void comms_handle_TxCallback(UART_HandleTypeDef *huart);
 void comms_handle_ow_master_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size);
 void comms_handle_ow_master_TxCpltCallback(UART_HandleTypeDef *huart);
 void comms_handle_ow_slave_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size);

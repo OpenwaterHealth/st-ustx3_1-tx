@@ -291,14 +291,6 @@ bool demote_to_slave()
 }
 
 // Callback functions
-void comms_handle_RxCpltCallback(UART_HandleTypeDef *huart, uint16_t pos) {
-
-    if (huart->Instance == USART1) {
-        // Notify the task
-    	rx_flag = 1;
-    }
-}
-
 void comms_handle_ow_slave_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
 {
     if (huart->Instance == USART2) {
@@ -340,16 +332,12 @@ void CDC_handle_TxCpltCallback() {
 	tx_flag = 1;
 }
 
-void comms_handle_TxCallback(UART_HandleTypeDef *huart) {
-
-	if (huart->Instance == USART1) {
-		tx_flag = 1;
-	}
-}
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
 
-    if (huart->Instance == USART1) {
-        // Handle errors here. Maybe reset DMA reception, etc.
+    if (huart->Instance == USART2) {
+
+    }else if (huart->Instance == USART3) {
+
     }
 }
