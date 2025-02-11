@@ -85,7 +85,7 @@ DMA_HandleTypeDef hdma_usart3_tx;
 //--uint8_t found_address_count = 0;
 int tx_count = 2;
 TX7332 tx[2];
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 1};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 2};
 uint32_t id_words[3] = {0};
 
 /* USER CODE END PV */
