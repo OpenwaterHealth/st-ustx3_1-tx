@@ -85,7 +85,7 @@ DMA_HandleTypeDef hdma_usart3_tx;
 //--uint8_t found_address_count = 0;
 int tx_count = 2;
 TX7332 tx[2];
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 1};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 4};
 uint32_t id_words[3] = {0};
 
 /* USER CODE END PV */
@@ -678,7 +678,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 0;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 24-1;
+  htim1.Init.Period = 4-1;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
@@ -702,7 +702,7 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 12;
+  sConfigOC.Pulse = 2;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
