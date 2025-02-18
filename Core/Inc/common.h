@@ -36,18 +36,16 @@ typedef enum {
 	OW_I2C_PASSTHRU = 0xE9,
 	OW_CONTROLLER = 0xEA,
 	OW_POWER = 0xEB,
-	OW_BAD_PARSE = 0xEC,
-	OW_BAD_CRC = 0xED,
-	OW_UNKNOWN = 0xEE,
+	OW_ONEWIRE_RESP = 0xEC,
 	OW_ERROR = 0xEF,
-
 } UartPacketTypes;
 
 typedef enum {
-	OW_CODE_SUCCESS = 0x00,
-	OW_CODE_IDENT_ERROR = 0xFD,
-	OW_CODE_DATA_ERROR = 0xFE,
-	OW_CODE_ERROR = 0xFF,
+	OW_SUCCESS = 0x00,
+	OW_UNKNOWN_COMMAND = 0xFC,
+	OW_BAD_CRC = 0xFD,
+	OW_INVALID_PACKET = 0xFE,
+	OW_UNKNOWN_ERROR = 0xFF,
 } UstxErrorCodes;
 
 typedef enum {
@@ -58,6 +56,7 @@ typedef enum {
 	OW_CMD_TOGGLE_LED = 0x04,
 	OW_CMD_HWID = 0x05,
 	OW_CMD_GET_TEMP = 0x06,
+	OW_CMD_TEST = 0x07,
 	OW_CMD_NOP = 0x0E,
 	OW_CMD_RESET = 0x0F,
 } UstxGlobalCommands;

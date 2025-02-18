@@ -30,8 +30,8 @@ uint8_t receive_afe_buff[I2C_BUFFER_SIZE] = {0};
 uint8_t send_afe_buff[I2C_BUFFER_SIZE] = {0};
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-static void process_afe_read_status(UartPacket *uartResp, UartPacket cmd);
-static void process_afe_read(UartPacket *uartResp, UartPacket cmd);
+static void process_afe_read_status(UartPacket *uartResp, UartPacket* cmd);
+static void process_afe_read(UartPacket *uartResp, UartPacket* cmd);
 
 static void print_uart_packet(const UartPacket* packet) {
     printf("ID: 0x%04X\r\n", packet->id);
@@ -46,21 +46,21 @@ static void print_uart_packet(const UartPacket* packet) {
     printf("\r\n");
 }
 
-static void process_afe_read(UartPacket *uartResp, UartPacket cmd)
+static void process_afe_read(UartPacket *uartResp, UartPacket* cmd)
 {
-	uint16_t rx_len =  cmd.command;
+	uint16_t rx_len =  cmd->command;
 	// I2C_TX_Packet afe_data_packet;
-	uint8_t slave_addr = cmd.addr;
+	uint8_t slave_addr = cmd->addr;
 	if(found_address_count == 0){
 		// printf("No AFE's found\r\n");
-		uartResp->id = cmd.id;
+		uartResp->id = cmd->id;
 		uartResp->packet_type = OW_ERROR;
-		uartResp->command = cmd.command;
+		uartResp->command = cmd->command;
 		return;
 	}else{
-		uartResp->id = cmd.id;
-		uartResp->packet_type = cmd.packet_type;
-		uartResp->command = cmd.command;
+		uartResp->id = cmd->id;
+		uartResp->packet_type = cmd->packet_type;
+		uartResp->command = cmd->command;
 		uartResp->data_len = 0;
 	}
 
@@ -73,33 +73,33 @@ static void process_afe_read(UartPacket *uartResp, UartPacket cmd)
 	// i2c_tx_packet_print(&afe_data_packet);
 }
 
-static void process_afe_send(UartPacket *uartResp, UartPacket cmd)
+static void process_afe_send(UartPacket *uartResp, UartPacket* cmd)
 {
 	uint16_t send_len = 0;
 	I2C_TX_Packet send_afe_packet;
-	uint8_t slave_addr = cmd.addr;
+	uint8_t slave_addr = cmd->addr;
 	// initialize send packet
-	send_afe_packet.id = cmd.id;
-	send_afe_packet.cmd = cmd.command;
-	send_afe_packet.reserved = cmd.reserved;
-	send_afe_packet.data_len = cmd.data_len;
+	send_afe_packet.id = cmd->id;
+	send_afe_packet.cmd = cmd->command;
+	send_afe_packet.reserved = cmd->reserved;
+	send_afe_packet.data_len = cmd->data_len;
 
 	if(found_address_count == 0){
 		// printf("No AFE's found\r\n");
-		uartResp->id = cmd.id;
+		uartResp->id = cmd->id;
 		uartResp->packet_type = OW_ERROR;
-		uartResp->command = cmd.command;
+		uartResp->command = cmd->command;
 		return;
 	}else{
-		uartResp->id = cmd.id;
-		uartResp->command = cmd.command;
+		uartResp->id = cmd->id;
+		uartResp->command = cmd->command;
 		uartResp->data_len = 0;
 	}
 
 	if(send_afe_packet.data_len==0){
 		send_afe_packet.pData = NULL;
 	}else{
-		send_afe_packet.pData = cmd.data;
+		send_afe_packet.pData = cmd->data;
 	}
 
 	send_len = i2c_packet_toBuffer(&send_afe_packet, send_afe_buff);
@@ -109,20 +109,20 @@ static void process_afe_send(UartPacket *uartResp, UartPacket cmd)
 }
 
 
-static void process_afe_read_status(UartPacket *uartResp, UartPacket cmd)
+static void process_afe_read_status(UartPacket *uartResp, UartPacket* cmd)
 {
 	uint16_t rx_len = 0;
-	uint8_t slave_addr = cmd.addr;
+	uint8_t slave_addr = cmd->addr;
 	if(found_address_count == 0){
 		// printf("No AFE's found\r\n");
-		uartResp->id = cmd.id;
+		uartResp->id = cmd->id;
 		uartResp->packet_type = OW_ERROR;
-		uartResp->command = cmd.command;
+		uartResp->command = cmd->command;
 		return;
 	}else{
-		uartResp->id = cmd.id;
-		uartResp->packet_type = cmd.packet_type;
-		uartResp->command = cmd.command;
+		uartResp->id = cmd->id;
+		uartResp->packet_type = cmd->packet_type;
+		uartResp->command = cmd->command;
 		uartResp->data_len = 0;
 	}
 
@@ -132,46 +132,114 @@ static void process_afe_read_status(UartPacket *uartResp, UartPacket cmd)
 	uartResp->data = receive_afe_status;
 }
 
-
-static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
+static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 {
-	switch (cmd.command)
+	switch (cmd->command)
 	{
 		case OW_CMD_PING:
-			uartResp->command = cmd.command;
-			uartResp->addr = cmd.addr;
-			uartResp->reserved = cmd.reserved;
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
 			break;
 		case OW_CMD_PONG:
-			uartResp->command = cmd.command;
-			uartResp->addr = cmd.addr;
-			uartResp->reserved = cmd.reserved;
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
 			break;
 		case OW_CMD_VERSION:
-			uartResp->command = cmd.command;
-			uartResp->addr = cmd.addr;
-			uartResp->reserved = cmd.reserved;
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = sizeof(FIRMWARE_VERSION_DATA);
 			uartResp->data = FIRMWARE_VERSION_DATA;
 			break;
 		case OW_CMD_ECHO:
 			// exact copy
-			uartResp->id = cmd.id;
-			uartResp->command = cmd.command;
-			uartResp->addr = cmd.addr;
-			uartResp->reserved = cmd.reserved;
-			uartResp->data_len = cmd.data_len;
-			uartResp->data = cmd.data;
+			uartResp->id = cmd->id;
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			uartResp->data_len = cmd->data_len;
+			uartResp->data = cmd->data;
 			break;
 		case OW_CMD_TOGGLE_LED:
-			uartResp->id = cmd.id;
-			uartResp->command = cmd.command;
+			uartResp->id = cmd->id;
+			uartResp->command = cmd->command;
 			HAL_GPIO_TogglePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin); //no led pins declared
 			break;
 		case OW_CMD_HWID:
 			uartResp->command = OW_CMD_HWID;
-			uartResp->addr = cmd.addr;
-			uartResp->reserved = cmd.reserved;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			id_words[0] = HAL_GetUIDw0();
+			id_words[1] = HAL_GetUIDw1();
+			id_words[2] = HAL_GetUIDw2();
+			uartResp->data_len = 16;
+			uartResp->data = (uint8_t *)&id_words;
+			break;
+		case OW_CMD_GET_TEMP:
+			last_temperature = 32.5;
+			uartResp->id = cmd->id;
+			uartResp->command = cmd->command;
+			uartResp->data_len = 4;
+			uartResp->data = (uint8_t *)&last_temperature;
+			break;
+		case OW_CMD_RESET:
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			uartResp->data_len = 0;
+
+			break;
+		default:
+			uartResp->addr = 0;
+			uartResp->reserved = 0;
+			uartResp->data_len = 0;
+			uartResp->reserved = OW_INVALID_PACKET;
+			uartResp->packet_type = OW_ERROR;
+			break;
+	}
+}
+
+static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
+{
+	switch (cmd->command)
+	{
+		case OW_CMD_PING:
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			break;
+		case OW_CMD_PONG:
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			break;
+		case OW_CMD_VERSION:
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			uartResp->data_len = sizeof(FIRMWARE_VERSION_DATA);
+			uartResp->data = FIRMWARE_VERSION_DATA;
+			break;
+		case OW_CMD_ECHO:
+			// exact copy
+			uartResp->id = cmd->id;
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			uartResp->data_len = cmd->data_len;
+			uartResp->data = cmd->data;
+			break;
+		case OW_CMD_TOGGLE_LED:
+			uartResp->id = cmd->id;
+			uartResp->command = cmd->command;
+			HAL_GPIO_TogglePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin); //no led pins declared
+			break;
+		case OW_CMD_HWID:
+			uartResp->command = OW_CMD_HWID;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
 			id_words[0] = HAL_GetUIDw0();
 			id_words[1] = HAL_GetUIDw1();
 			id_words[2] = HAL_GetUIDw2();
@@ -180,15 +248,15 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 			break;
 		case OW_CMD_GET_TEMP:
 			last_temperature = Thermistor_ReadTemperature();
-			uartResp->id = cmd.id;
-			uartResp->command = cmd.command;
+			uartResp->id = cmd->id;
+			uartResp->command = cmd->command;
 			uartResp->data_len = 4;
 			uartResp->data = (uint8_t *)&last_temperature;
 			break;
 		case OW_CTRL_START_SWTRIG:
-			uartResp->command = cmd.command;
-			uartResp->addr = cmd.addr;
-			uartResp->reserved = cmd.reserved;
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = 0;
 			if(!start_trigger_pulse())
 			{
@@ -196,9 +264,9 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 			}
 			break;
 		case OW_CTRL_STOP_SWTRIG:
-			uartResp->command = cmd.command;
-			uartResp->addr = cmd.addr;
-			uartResp->reserved = cmd.reserved;
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = 0;
 			if(!stop_trigger_pulse())
 			{
@@ -206,12 +274,12 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 			}
 			break;
 		case OW_CTRL_SET_SWTRIG:
-			uartResp->command = cmd.command;
-			uartResp->addr = cmd.addr;
-			uartResp->reserved = cmd.reserved;
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = 0;
 
-			if(!set_trigger_data((char *)cmd.data, cmd.data_len))
+			if(!set_trigger_data((char *)cmd->data, cmd->data_len))
 			{
 				uartResp->packet_type = OW_ERROR;
 			}else{
@@ -233,16 +301,16 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 				uartResp->packet_type = OW_ERROR;
 				break;
 			}
-			uartResp->command = cmd.command;
-			uartResp->addr = cmd.addr;
-			uartResp->reserved = cmd.reserved;
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = strlen(retTriggerJson);
 			uartResp->data = (uint8_t *)retTriggerJson;
 			break;
 		case OW_CMD_RESET:
-			uartResp->command = cmd.command;
-			uartResp->addr = cmd.addr;
-			uartResp->reserved = cmd.reserved;
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = 0;
 
 			__HAL_TIM_CLEAR_FLAG(&htim17, TIM_FLAG_UPDATE);
@@ -253,30 +321,30 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 			break;
 		default:
 			uartResp->addr = 0;
-			uartResp->reserved = 0;
+			uartResp->reserved = OW_INVALID_PACKET;
 			uartResp->data_len = 0;
-			uartResp->packet_type = OW_UNKNOWN;
+			uartResp->packet_type = OW_ERROR;
 			break;
 	}
 
 }
 
-static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
+static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 {
 	uint16_t reg_address = 0;
 	uint32_t reg_value = 0;
 	uint32_t reg_data_buff[REG_DATA_LEN] = {0};
 	int reg_count = 0;
 
-	uartResp->id = cmd.id;
-	uartResp->command = cmd.command;
+	uartResp->id = cmd->id;
+	uartResp->command = cmd->command;
 
-	switch (cmd.command)
+	switch (cmd->command)
 	{
 	case OW_TX7332_ENUM:
 		// send array of tx chip counts 0,1,2,3,4,...
 		uartResp->command = OW_TX7332_ENUM;
-		uartResp->addr = cmd.addr;
+		uartResp->addr = cmd->addr;
 		// Here we will have the array for all tx chips with 0,1 on the controller
 		// and 2,3 on the first slave in the chain and so on
 		uartResp->reserved = (uint8_t)ARRAY_SIZE(tx);
@@ -287,7 +355,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		uartResp->command = OW_TX7332_DEMO;
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		uartResp->addr = cmd.addr;
+		uartResp->addr = cmd->addr;
 	    for (int i = 0; i < tx_count; i++) {
 	        write_demo_registers(&tx[i]);
 	    }
@@ -296,39 +364,39 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		break;
 	case OW_TX7332_WREG:
 		uartResp->command = OW_TX7332_WREG;
-		uartResp->addr = cmd.addr;
+		uartResp->addr = cmd->addr;
 		uartResp->reserved = 0;
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		if(cmd.data_len != 6 || cmd.addr >= tx_count){
+		if(cmd->data_len != 6 || cmd->addr >= tx_count){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
 
 		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_address = cmd.data[0] | (cmd.data[1] << 8);
+		reg_address = cmd->data[0] | (cmd->data[1] << 8);
 		// Unpack 32-bit value (next 4 bytes, little-endian)
-		reg_value = cmd.data[2] | (cmd.data[3] << 8) | (cmd.data[4] << 16) | (cmd.data[5] << 24);
+		reg_value = cmd->data[2] | (cmd->data[3] << 8) | (cmd->data[4] << 16) | (cmd->data[5] << 24);
 
-		TX7332_WriteReg(&tx[cmd.addr], reg_address, reg_value);
+		TX7332_WriteReg(&tx[cmd->addr], reg_address, reg_value);
 
 		break;
 	case OW_TX7332_RREG:
 		uartResp->command = OW_TX7332_RREG;
-		uartResp->addr = cmd.addr;
+		uartResp->addr = cmd->addr;
 		uartResp->reserved = 0;
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		if(cmd.data_len != 2 || cmd.addr >= tx_count){
+		if(cmd->data_len != 2 || cmd->addr >= tx_count){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
 
 		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_address = cmd.data[0] | (cmd.data[1] << 8);
+		reg_address = cmd->data[0] | (cmd->data[1] << 8);
 		reg_value = 0;
 
-		reg_value = TX7332_ReadReg(&tx[cmd.addr], reg_address);
+		reg_value = TX7332_ReadReg(&tx[cmd->addr], reg_address);
 		memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
 
 		// Package response
@@ -339,22 +407,22 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		break;
 	case OW_TX7332_WBLOCK:
 		uartResp->command = OW_TX7332_WBLOCK;
-		uartResp->addr = cmd.addr;
+		uartResp->addr = cmd->addr;
 		uartResp->reserved = 0;
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		if(cmd.data_len <= 6 || cmd.addr >= tx_count){
+		if(cmd->data_len <= 6 || cmd->addr >= tx_count){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
 
 		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_address = cmd.data[0] | (cmd.data[1] << 8);
+		reg_address = cmd->data[0] | (cmd->data[1] << 8);
 		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_count = cmd.data[2];
+		reg_count = cmd->data[2];
 		// byte [3] dummy byte
 		// Check if the actual data length matches expected length
-		if(cmd.data_len != (4 + (4 * reg_count)))
+		if(cmd->data_len != (4 + (4 * reg_count)))
 		{
 			// printf("Invalid data size does not match \r\n");
 			uartResp->packet_type = OW_ERROR;
@@ -364,29 +432,29 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 
 		memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
 
-		memcpy((uint8_t*)reg_data_buff, &cmd.data[4], sizeof(uint32_t) * reg_count);
-		if(!TX7332_WriteBulk(&tx[cmd.addr], reg_address, reg_data_buff, reg_count)){
+		memcpy((uint8_t*)reg_data_buff, &cmd->data[4], sizeof(uint32_t) * reg_count);
+		if(!TX7332_WriteBulk(&tx[cmd->addr], reg_address, reg_data_buff, reg_count)){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
 		break;
 	case OW_TX7332_VWREG:
 		uartResp->command = OW_TX7332_VWREG;
-		uartResp->addr = cmd.addr;
+		uartResp->addr = cmd->addr;
 		uartResp->reserved = 0;
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		if(cmd.data_len != 6 || cmd.addr >= tx_count){
+		if(cmd->data_len != 6 || cmd->addr >= tx_count){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
 
 		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_address = cmd.data[0] | (cmd.data[1] << 8);
+		reg_address = cmd->data[0] | (cmd->data[1] << 8);
 		// Unpack 32-bit value (next 4 bytes, little-endian)
-		reg_value = cmd.data[2] | (cmd.data[3] << 8) | (cmd.data[4] << 16) | (cmd.data[5] << 24);
+		reg_value = cmd->data[2] | (cmd->data[3] << 8) | (cmd->data[4] << 16) | (cmd->data[5] << 24);
 
-		if(!TX7332_WriteVerify(&tx[cmd.addr], reg_address, reg_value))
+		if(!TX7332_WriteVerify(&tx[cmd->addr], reg_address, reg_value))
 		{
 			uartResp->packet_type = OW_ERROR;
 		}
@@ -394,22 +462,22 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		break;
 	case OW_TX7332_VWBLOCK:
 		uartResp->command = OW_TX7332_VWBLOCK;
-		uartResp->addr = cmd.addr;
+		uartResp->addr = cmd->addr;
 		uartResp->reserved = 0;
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		if(cmd.data_len <= 6 || cmd.addr >= tx_count){
+		if(cmd->data_len <= 6 || cmd->addr >= tx_count){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
 
 		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_address = cmd.data[0] | (cmd.data[1] << 8);
+		reg_address = cmd->data[0] | (cmd->data[1] << 8);
 		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_count = cmd.data[2];
+		reg_count = cmd->data[2];
 		// byte [3] dummy byte
 		// Check if the actual data length matches expected length
-		if(cmd.data_len != (4 + (4 * reg_count)))
+		if(cmd->data_len != (4 + (4 * reg_count)))
 		{
 			// printf("Invalid data size does not match \r\n");
 			uartResp->packet_type = OW_ERROR;
@@ -419,8 +487,8 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 
 		memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
 
-		memcpy((uint8_t*)reg_data_buff, &cmd.data[4], sizeof(uint32_t) * reg_count);
-		if(!TX7332_WriteBulkVerify(&tx[cmd.addr], reg_address, reg_data_buff, reg_count)){
+		memcpy((uint8_t*)reg_data_buff, &cmd->data[4], sizeof(uint32_t) * reg_count);
+		if(!TX7332_WriteBulkVerify(&tx[cmd->addr], reg_address, reg_data_buff, reg_count)){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
@@ -434,67 +502,57 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket cmd)
 		break;
 	default:
 		uartResp->data_len = 0;
-		uartResp->packet_type = OW_UNKNOWN;
+		uartResp->reserved = OW_INVALID_PACKET;
+		uartResp->packet_type = OW_ERROR;
 		break;
 	}
 }
 
-UartPacket process_if_command(UartPacket cmd)
+bool process_if_command(UartPacket *cmd, UartPacket *resp)
 {
-	UartPacket uartResp;
 	// I2C_TX_Packet i2c_packet;
 	(void)print_uart_packet;
 
-	uartResp.id = cmd.id;
-	uartResp.packet_type = OW_RESP;
-	uartResp.addr = 0;
-	uartResp.reserved = 0;
-	uartResp.data_len = 0;
-	uartResp.data = 0;
-	switch (cmd.packet_type)
+	resp->id = cmd->id;
+	if(cmd->packet_type == OW_ONE_WIRE){
+		resp->packet_type = OW_ONEWIRE_RESP;
+	}else{
+		resp->packet_type = OW_RESP;
+	}
+	resp->addr = 0;
+	resp->reserved = 0;
+	resp->data_len = 0;
+	resp->data = 0;
+	switch (cmd->packet_type)
 	{
 	case OW_ONE_WIRE:
-		//OW_ONE_WIRE_ProcessCommand(&uartResp, cmd);
+		ONE_WIRE_ProcessCommand(resp, cmd);
 		break;
 	case OW_CMD:
 	case OW_CONTROLLER:
 		//process by the USTX Controller
-		CONTROLLER_ProcessCommand(&uartResp, cmd);
+		CONTROLLER_ProcessCommand(resp, cmd);
 		break;
 	case OW_TX7332:
-		TX7332_ProcessCommand(&uartResp, cmd);
+		TX7332_ProcessCommand(resp, cmd);
 		break;
 	case OW_AFE_STATUS:
-		process_afe_read_status(&uartResp, cmd);
+		process_afe_read_status(resp, cmd);
 		break;
 	case OW_AFE_READ:
-		process_afe_read(&uartResp, cmd);
+		process_afe_read(resp, cmd);
 		break;
 	case OW_AFE_SEND:
-		process_afe_send(&uartResp, cmd);
+		process_afe_send(resp, cmd);
 		break;
-#if 0
-	case OW_I2C_PASSTHRU:
-
-		print_uart_packet(&cmd);
-
-        // printBuffer(cmd.data, 10);
-		i2c_packet_fromBuffer(cmd.data, &i2c_packet);
-		// i2c_tx_packet_print(&i2c_packet);
-
-		HAL_Delay(20);
-		send_buffer_to_slave(cmd.command, cmd.data, 10);
-
-		break;
-#endif
 	default:
-		uartResp.data_len = 0;
-		uartResp.packet_type = OW_UNKNOWN;
-		// uartResp.data = (uint8_t*)&cmd.tag;
+		resp->data_len = 0;
+		resp->reserved = OW_UNKNOWN_ERROR;
+		resp->packet_type = OW_ERROR;
 		break;
 	}
 
-	return uartResp;
+	return true;
 
 }
 
