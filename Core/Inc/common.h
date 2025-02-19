@@ -57,6 +57,7 @@ typedef enum {
 	OW_CMD_HWID = 0x05,
 	OW_CMD_GET_TEMP = 0x06,
 	OW_CMD_TEST = 0x07,
+	OW_CMD_DFU = 0x0D,
 	OW_CMD_NOP = 0x0E,
 	OW_CMD_RESET = 0x0F,
 } UstxGlobalCommands;

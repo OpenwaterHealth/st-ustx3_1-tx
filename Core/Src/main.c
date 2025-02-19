@@ -49,6 +49,9 @@
 /* USER CODE BEGIN PD */
 #define TOGGLE_INTERVAL 500  // Toggle every 500ms
 
+#define SYSTEM_MEMORY_BASE 0x1FF0F800  // Bootloader start address for STM32F072
+#define DEBOUNCE_DELAY_MS 10
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -85,9 +88,10 @@ DMA_HandleTypeDef hdma_usart3_tx;
 //--uint8_t found_address_count = 0;
 int tx_count = 2;
 TX7332 tx[2];
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 2};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 3};
 uint32_t id_words[3] = {0};
 volatile bool _configured = false;
+volatile bool _enter_dfu = false;
 
 /* USER CODE END PV */
 
@@ -1142,6 +1146,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim->Instance == TIM17) {
       // Stop the timer to prevent re-triggering
       HAL_TIM_Base_Stop_IT(htim);
+
+      if(_enter_dfu){
+		// jump to bootloader DFU
+		// 16k SRAM in address 0x2000 0000 - 0x2000 3FFF
+		*((unsigned long *)0x20003FF0) = 0xDEADBEEF;
+      }
 
 	  // Reset the board
 	  NVIC_SystemReset();

@@ -184,13 +184,6 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			uartResp->data_len = 4;
 			uartResp->data = (uint8_t *)&last_temperature;
 			break;
-		case OW_CMD_RESET:
-			uartResp->command = cmd->command;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
-			uartResp->data_len = 0;
-
-			break;
 		default:
 			uartResp->addr = 0;
 			uartResp->reserved = 0;
@@ -200,6 +193,8 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			break;
 	}
 }
+
+extern volatile bool _enter_dfu;
 
 static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 {
@@ -312,6 +307,20 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->addr = cmd->addr;
 			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = 0;
+
+			__HAL_TIM_CLEAR_FLAG(&htim17, TIM_FLAG_UPDATE);
+			__HAL_TIM_SET_COUNTER(&htim17, 0);
+			if(HAL_TIM_Base_Start_IT(&htim17) != HAL_OK){
+				uartResp->packet_type = OW_ERROR;
+			}
+			break;
+		case OW_CMD_DFU:
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			uartResp->data_len = 0;
+
+			_enter_dfu = true;
 
 			__HAL_TIM_CLEAR_FLAG(&htim17, TIM_FLAG_UPDATE);
 			__HAL_TIM_SET_COUNTER(&htim17, 0);
