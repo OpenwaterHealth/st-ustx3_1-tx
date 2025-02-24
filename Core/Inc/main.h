@@ -160,6 +160,9 @@ extern TIM_HandleTypeDef htim17;
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart3;
 
+#define GLOBAL_I2C_DEVICE hi2c2
+#define LOCAL_I2C_DEVICE hi2c1
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
