@@ -165,3 +165,22 @@ bool I2C_write_CDCE6214_reg(uint8_t i2c_addr, uint16_t reg_addr, uint16_t reg_va
 
 	return b_res;
 }
+
+float MAX31875_ReadTemperature(void) {
+    uint8_t pointer_byte = 0x00;  // Temperature Register
+    uint8_t temp_data[2];
+    int16_t raw_temp;
+    float temperature;
+
+    // Set pointer register to Temperature Register
+    HAL_I2C_Master_Transmit(&LOCAL_I2C_DEVICE, MAX31875_ADDRESS << 1, &pointer_byte, 1, HAL_MAX_DELAY);
+
+    // Read temperature data
+    HAL_I2C_Master_Receive(&LOCAL_I2C_DEVICE, MAX31875_ADDRESS << 1, temp_data, 2, HAL_MAX_DELAY);
+
+    // Convert raw data to temperature
+    raw_temp = (temp_data[0] << 8) | temp_data[1];
+    temperature = (raw_temp >> 4) * 0.0625;  // For 12-bit resolution
+
+    return temperature;
+}

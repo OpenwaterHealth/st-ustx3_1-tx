@@ -20,4 +20,6 @@ uint8_t read_data_register_of_slave(uint8_t slave_addr, uint8_t* pBuffer, size_t
 uint16_t I2C_read_CDCE6214_reg(uint8_t i2c_addr, uint16_t reg_addr);
 bool I2C_write_CDCE6214_reg(uint8_t i2c_addr, uint16_t reg_addr, uint16_t reg_val);
 
+float MAX31875_ReadTemperature(void);
+
 #endif /* INC_I2C_MASTER_H_ */
