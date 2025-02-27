@@ -88,7 +88,7 @@ DMA_HandleTypeDef hdma_usart3_tx;
 //--uint8_t found_address_count = 0;
 int tx_count = 2;
 TX7332 tx[2];
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 3};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 4};
 uint32_t id_words[3] = {0};
 volatile bool _configured = false;
 volatile bool _enter_dfu = false;
@@ -284,7 +284,7 @@ int main(void)
   }
 
   HAL_Delay(5);
-  // I2C_scan();
+  //I2C_scan();
   ConfigureClock();
   HAL_Delay(5);
 

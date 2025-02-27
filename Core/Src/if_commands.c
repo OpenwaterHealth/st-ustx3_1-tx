@@ -24,8 +24,8 @@ extern int tx_count;
 
 static uint32_t id_words[3] = {0};
 static char retTriggerJson[0xFF];
-static float last_temperature = 0;
-static float ambient_temperature = 0;
+volatile float last_temperature = 0;
+volatile float ambient_temperature = 0;
 
 uint8_t receive_afe_status[I2C_STATUS_SIZE] = {0};
 uint8_t receive_afe_buff[I2C_BUFFER_SIZE] = {0};
@@ -262,6 +262,7 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->command = cmd->command;
 			uartResp->data_len = 4;
 			uartResp->data = (uint8_t *)&ambient_temperature;
+			break;
 		case OW_CTRL_START_SWTRIG:
 			uartResp->command = cmd->command;
 			uartResp->addr = cmd->addr;
