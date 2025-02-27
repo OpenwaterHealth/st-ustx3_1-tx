@@ -201,7 +201,8 @@ void HAL_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
   /* USER CODE BEGIN 2 */
   if(get_device_role() == ROLE_MASTER)
   {
-	demote_to_slave();
+	  set_device_role(ROLE_SLAVE);
+	  set_reconfigure();
   }
 
   if (hpcd->Init.low_power_enable)
@@ -227,7 +228,8 @@ void HAL_PCD_ResumeCallback(PCD_HandleTypeDef *hpcd)
   /* USER CODE BEGIN 3 */
   if(get_device_role() != ROLE_MASTER)
   {
-	promote_to_master();
+	  set_device_role(ROLE_MASTER);
+	  set_reconfigure();
   }
 
   if (hpcd->Init.low_power_enable)

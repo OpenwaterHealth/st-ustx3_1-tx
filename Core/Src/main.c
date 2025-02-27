@@ -49,6 +49,9 @@
 /* USER CODE BEGIN PD */
 #define TOGGLE_INTERVAL 500  // Toggle every 500ms
 
+#define SYSTEM_MEMORY_BASE 0x1FF0F800  // Bootloader start address for STM32F072
+#define DEBOUNCE_DELAY_MS 10
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -85,8 +88,10 @@ DMA_HandleTypeDef hdma_usart3_tx;
 //--uint8_t found_address_count = 0;
 int tx_count = 2;
 TX7332 tx[2];
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 2};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 4};
 uint32_t id_words[3] = {0};
+volatile bool _configured = false;
+volatile bool _enter_dfu = false;
 
 /* USER CODE END PV */
 
@@ -111,6 +116,9 @@ static void MX_TIM17_Init(void);
 OW_TimerData _timerDataConfig;
 OW_TriggerConfig _triggerConfig;
 
+void set_reconfigure(){
+	_configured = false;
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -276,7 +284,7 @@ int main(void)
   }
 
   HAL_Delay(5);
-  // I2C_scan();
+  //I2C_scan();
   ConfigureClock();
   HAL_Delay(5);
 
@@ -312,13 +320,7 @@ int main(void)
   HAL_GPIO_WritePin(TR7_EN_GPIO_Port, TR7_EN_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TR8_EN_GPIO_Port, TR8_EN_Pin, GPIO_PIN_SET);
 
-  // start listen
-  if(get_device_role()==ROLE_MASTER){
-	  set_module_ID(0);
-	  comms_host_start();
-  }else{
-	  comms_onewire_slave_start();
-  }
+  HAL_Delay(100);
 
   // system entering ready state
   HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
@@ -333,14 +335,28 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	current_time = HAL_GetTick(); // Get current time
-	if(get_device_role()==ROLE_MASTER){
-		comms_host_check_received(); // check comms
-	}
-    if ((current_time - last_toggle_time) >= TOGGLE_INTERVAL) {
-        HAL_GPIO_TogglePin(LD_HB_GPIO_Port, LD_HB_Pin); // Toggle LED
-        last_toggle_time = current_time; // Update the last toggle time
-    }
 
+	if(!_configured){
+	  // start listen
+	  if(get_device_role()==ROLE_MASTER){
+		  configure_master();
+	  }else{
+		  configure_slave();
+	  }
+	  _configured = true;
+	}
+	else
+	{
+		if(get_device_role()== ROLE_MASTER){
+			comms_host_check_received(); // check comms
+		}else{
+			comms_onewire_check_received();
+		}
+	}
+	if ((current_time - last_toggle_time) >= TOGGLE_INTERVAL) {
+		HAL_GPIO_TogglePin(LD_HB_GPIO_Port, LD_HB_Pin);
+		last_toggle_time = current_time; // Update the last toggle time
+	}
   }
   /* USER CODE END 3 */
 }
@@ -1130,6 +1146,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim->Instance == TIM17) {
       // Stop the timer to prevent re-triggering
       HAL_TIM_Base_Stop_IT(htim);
+
+      if(_enter_dfu){
+		// jump to bootloader DFU
+		// 16k SRAM in address 0x2000 0000 - 0x2000 3FFF
+		*((unsigned long *)0x20003FF0) = 0xDEADBEEF;
+      }
 
 	  // Reset the board
 	  NVIC_SystemReset();

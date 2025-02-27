@@ -34,6 +34,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 volatile uint8_t read_to_idle_enabled = 0;
+volatile uint8_t receive_to_idle_cancelled = 0;
 volatile uint16_t rxIndex = 0;
 volatile uint16_t rxMaxSize = 0;
 uint8_t* pRX = 0;
@@ -348,7 +349,7 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
 }
 
 void CDC_FlushRxBuffer_FS() {
-
+	USBD_LL_FlushEP(&hUsbDeviceFS, CDC_OUT_EP);
 }
 
 void CDC_ReceiveToIdle(uint8_t* Buf, uint16_t max_size)
@@ -357,6 +358,13 @@ void CDC_ReceiveToIdle(uint8_t* Buf, uint16_t max_size)
     rxMaxSize = max_size;
     pRX = Buf;
 	read_to_idle_enabled = 1;
+}
+
+void CDC_Stop_ReceiveToIdle()
+{
+    receive_to_idle_cancelled = 1;
+	HAL_TIM_Base_Stop_IT(&htim14);
+	read_to_idle_enabled = 0;
 }
 
 extern void CDC_handle_RxCpltCallback(uint16_t len);

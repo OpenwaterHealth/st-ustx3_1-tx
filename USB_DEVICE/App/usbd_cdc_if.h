@@ -54,7 +54,7 @@
 
  void CDC_FlushRxBuffer_FS();
  void CDC_ReceiveToIdle(uint8_t* Buf, uint16_t max_size);
-
+ void CDC_Stop_ReceiveToIdle();
  void CDC_Idle_Timer_Handler();
 
 /* USER CODE END EXPORTED_DEFINES */

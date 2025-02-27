@@ -14,7 +14,6 @@
 
 //#define MAX_FOUND_ADDRESSES 5
 
-#define I2C_LOCAL_DEVICE hi2c1
 
 uint8_t selected_slave = 0xFF;
 uint8_t found_address_count = 0;
@@ -28,7 +27,7 @@ void I2C_scan(void)
 
     for (uint8_t address = 0x0; address < 0x7f; address++) {
         HAL_StatusTypeDef status;
-        status = HAL_I2C_IsDeviceReady(&I2C_LOCAL_DEVICE, address << 1, 2, 200); // Address shift left by 1 for read/write bit
+        status = HAL_I2C_IsDeviceReady(&LOCAL_I2C_DEVICE, address << 1, 2, 200); // Address shift left by 1 for read/write bit
         if (status == HAL_OK) {
             found_addresses[found_address_count] = address;
             found_address_count++;
@@ -47,13 +46,13 @@ void I2C_scan(void)
 uint8_t send_buffer_to_slave(uint8_t slave_addr, uint8_t* pBuffer, uint16_t buf_len)
 {
 	// Check if the I2C handle is valid
-    if (HAL_I2C_GetState(&I2C_LOCAL_DEVICE) != HAL_I2C_STATE_READY) {
+    if (HAL_I2C_GetState(&LOCAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
     	printf("===> ERROR I2C Not in ready state\r\n");
         return 1; // I2C is not in a ready state
     }
 
 	// printf("===> Sending Packet %d Bytes\r\n", buf_len);
-    if(HAL_I2C_Master_Transmit(&I2C_LOCAL_DEVICE, (uint16_t)(slave_addr << 1), pBuffer, buf_len, HAL_MAX_DELAY)!= HAL_OK)
+    if(HAL_I2C_Master_Transmit(&LOCAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), pBuffer, buf_len, HAL_MAX_DELAY)!= HAL_OK)
 	{
         /* Error_Handler() function is called when error occurs. */
         Error_Handler();
@@ -67,7 +66,7 @@ uint8_t read_status_register_of_slave(uint8_t slave_addr, uint8_t* pBuffer, uint
 {
 	uint8_t rx_len = sizeof(I2C_STATUS_Packet);
 	// Check if the I2C handle is valid
-    if (HAL_I2C_GetState(&I2C_LOCAL_DEVICE) != HAL_I2C_STATE_READY) {
+    if (HAL_I2C_GetState(&LOCAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
     	printf("===> ERROR I2C Not in ready state\r\n");
         return 1; // I2C is not in a ready state
     }
@@ -76,7 +75,7 @@ uint8_t read_status_register_of_slave(uint8_t slave_addr, uint8_t* pBuffer, uint
 
 #if 0
 
-	if(HAL_I2C_Master_Receive(&I2C_LOCAL_DEVICE, (uint16_t)(slave_addr << 1), pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
+	if(HAL_I2C_Master_Receive(&LOCAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
 	{
         /* Error_Handler() function is called when error occurs. */
         Error_Handler();
@@ -84,7 +83,7 @@ uint8_t read_status_register_of_slave(uint8_t slave_addr, uint8_t* pBuffer, uint
 
 #else
 
-    if(HAL_I2C_Mem_Read(&I2C_LOCAL_DEVICE, (uint16_t)(slave_addr << 1), 0x00, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
+    if(HAL_I2C_Mem_Read(&LOCAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), 0x00, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
     {
         /* Error_Handler() function is called when error occurs. */
         Error_Handler();
@@ -97,14 +96,14 @@ uint8_t read_status_register_of_slave(uint8_t slave_addr, uint8_t* pBuffer, uint
 uint8_t read_data_register_of_slave(uint8_t slave_addr, uint8_t* pBuffer, size_t rx_len)
 {
 	// Check if the I2C handle is valid
-    if (HAL_I2C_GetState(&I2C_LOCAL_DEVICE) != HAL_I2C_STATE_READY) {
+    if (HAL_I2C_GetState(&LOCAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
     	printf("===> ERROR I2C Not in ready state\r\n");
         return 1; // I2C is not in a ready state
     }
 
 	// printf("===> Receive Data Packet %d Bytes\r\n", rx_len);
 
-    if(HAL_I2C_Mem_Read(&I2C_LOCAL_DEVICE, (uint16_t)(slave_addr << 1), 0x01, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
+    if(HAL_I2C_Mem_Read(&LOCAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), 0x01, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
     {
         /* Error_Handler() function is called when error occurs. */
         Error_Handler();
@@ -126,14 +125,14 @@ uint16_t I2C_read_CDCE6214_reg(uint8_t i2c_addr, uint16_t reg_addr)
     uint8_t data_to_receive[2];
 
     // Start I2C communication
-    status = HAL_I2C_Master_Transmit(&I2C_LOCAL_DEVICE, i2c_addr << 1, data_to_send, 2, HAL_MAX_DELAY);
+    status = HAL_I2C_Master_Transmit(&LOCAL_I2C_DEVICE, i2c_addr << 1, data_to_send, 2, HAL_MAX_DELAY);
     if (status != HAL_OK) {
         // Handle error
         return 0xFFFF; // Return an error value
     }
 
     // Receive the data from the CDCE6214 chip
-    status = HAL_I2C_Master_Receive(&I2C_LOCAL_DEVICE, i2c_addr << 1, data_to_receive, 2, HAL_MAX_DELAY);
+    status = HAL_I2C_Master_Receive(&LOCAL_I2C_DEVICE, i2c_addr << 1, data_to_receive, 2, HAL_MAX_DELAY);
     if (status != HAL_OK) {
         // Handle error
         return 0xFFFF; // Return an error value
@@ -158,11 +157,30 @@ bool I2C_write_CDCE6214_reg(uint8_t i2c_addr, uint16_t reg_addr, uint16_t reg_va
     data_to_send[3] = (uint8_t)(reg_val & 0xFF); // Data low byte
 
     // Start I2C communication and send the data
-    status = HAL_I2C_Master_Transmit(&I2C_LOCAL_DEVICE, i2c_addr << 1, data_to_send, 4, HAL_MAX_DELAY);
+    status = HAL_I2C_Master_Transmit(&LOCAL_I2C_DEVICE, i2c_addr << 1, data_to_send, 4, HAL_MAX_DELAY);
     if (status != HAL_OK) {
         // Handle error
         b_res = false;
     }
 
 	return b_res;
+}
+
+float MAX31875_ReadTemperature(void) {
+    uint8_t pointer_byte = 0x00;  // Temperature Register
+    uint8_t temp_data[2];
+    int16_t raw_temp;
+    float temperature;
+
+    // Set pointer register to Temperature Register
+    HAL_I2C_Master_Transmit(&LOCAL_I2C_DEVICE, MAX31875_ADDRESS << 1, &pointer_byte, 1, HAL_MAX_DELAY);
+
+    // Read temperature data
+    HAL_I2C_Master_Receive(&LOCAL_I2C_DEVICE, MAX31875_ADDRESS << 1, temp_data, 2, HAL_MAX_DELAY);
+
+    // Convert raw data to temperature
+    raw_temp = (temp_data[0] << 8) | temp_data[1];
+    temperature = (raw_temp >> 4) * 0.0625;  // For 12-bit resolution
+
+    return temperature;
 }
