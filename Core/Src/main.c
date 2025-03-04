@@ -30,7 +30,9 @@
 #include "tx7332.h"
 #include "usbd_cdc_if.h"
 #include "uart_comms.h"
+#include "module_manager.h"
 #include "trigger.h"
+#include "i2c_slave.h"
 #include "thermistor.h"
 
 #include "utils.h"
@@ -84,14 +86,14 @@ DMA_HandleTypeDef hdma_usart3_rx;
 DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
-//--uint8_t found_addresses[MAX_FOUND_ADDRESSES];
-//--uint8_t found_address_count = 0;
+
 int tx_count = 2;
 TX7332 tx[2];
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 4};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 5};
 uint32_t id_words[3] = {0};
-volatile bool _configured = false;
+
 volatile bool _enter_dfu = false;
+volatile bool _usb_interrupt_flag = false;
 
 /* USER CODE END PV */
 
@@ -116,9 +118,6 @@ static void MX_TIM17_Init(void);
 OW_TimerData _timerDataConfig;
 OW_TriggerConfig _triggerConfig;
 
-void set_reconfigure(){
-	_configured = false;
-}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -252,6 +251,14 @@ int main(void)
   MX_TIM14_Init();
   MX_TIM17_Init();
   /* USER CODE BEGIN 2 */
+  SetPinsHighImpedance();
+
+  // setup default
+  OW_TIM15_DeInit();
+  _timerDataConfig.TriggerFrequencyHz = 10;
+  _timerDataConfig.TriggerPulseCount = 0; // no pulse count
+  _timerDataConfig.TriggerPulseWidthUsec = 15000;
+  _timerDataConfig.TriggerMode = 0; // continuous
 
   HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_SET);
@@ -261,31 +268,7 @@ int main(void)
   // Initialize thermistor library
   Thermistor_Start(&hadc, 2.5f, 10000.0f);
 
-  // clock chip setup
-  SetPinsHighImpedance();
-  HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
-  HAL_Delay(25);
-
-  // setup default
-  OW_TIM15_DeInit();
-  _timerDataConfig.TriggerFrequencyHz = 10;
-  _timerDataConfig.TriggerPulseCount = 0; // no pulse count
-  _timerDataConfig.TriggerPulseWidthUsec = 15000;
-  _timerDataConfig.TriggerMode = 0; // continuous
-
-  if(get_device_role()==ROLE_MASTER){
-	  // configure PWM for trigger pulse
-	  init_trigger_pulse(&htim15, TIM_CHANNEL_2);
-	  HAL_Delay(1);
-	  deinit_trigger_pulse(&htim15, TIM_CHANNEL_2);
-
-	  // 2MHz reference signal
-	  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-  }
-
-  HAL_Delay(5);
   //I2C_scan();
-  ConfigureClock();
   HAL_Delay(5);
 
   // Initializing TX7332
@@ -336,14 +319,52 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	current_time = HAL_GetTick(); // Get current time
 
-	if(!_configured){
+	if(!get_configured()) {
 	  // start listen
 	  if(get_device_role()==ROLE_MASTER){
 		  configure_master();
+		  // configure PWM for trigger pulse
+		  init_trigger_pulse(&htim15, TIM_CHANNEL_2);
+		  HAL_Delay(1);
+		  deinit_trigger_pulse(&htim15, TIM_CHANNEL_2);
+
+		  // 2MHz reference signal
+		  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+		  HAL_Delay(25);
+
+		  // clock chip setup
+		  HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
+		  HAL_Delay(25);
+		  ConfigureClock();
+
 	  }else{
 		  configure_slave();
+		  //printf("Waiting on i2c address...\r\n");
 	  }
-	  _configured = true;
+	  HAL_Delay(250);
+	  if(get_device_role()==ROLE_MASTER){
+		  HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_RESET);
+		  HAL_Delay(200);
+		  HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
+		  HAL_Delay(500);
+		  enumerate_slaves();
+		  set_configured(true);
+		  comms_host_start();
+	  }else{
+		  HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
+		  while(!get_configured() && !_usb_interrupt_flag)
+		  {
+			comms_onewire_check_received();
+			uint8_t my_slave_address = get_slave_addres();
+			if(my_slave_address>=0x20){
+				I2C_Slave_Init(my_slave_address);
+			}
+			HAL_Delay(1);
+		  }
+		  if(_usb_interrupt_flag) {
+			  _usb_interrupt_flag = false;
+		  }
+	  }
 	}
 	else
 	{
@@ -353,6 +374,7 @@ int main(void)
 			comms_onewire_check_received();
 		}
 	}
+
 	if ((current_time - last_toggle_time) >= TOGGLE_INTERVAL) {
 		HAL_GPIO_TogglePin(LD_HB_GPIO_Port, LD_HB_Pin);
 		last_toggle_time = current_time; // Update the last toggle time
@@ -981,8 +1003,8 @@ static void MX_DMA_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
+  /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -1092,18 +1114,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(ESTOP_GPIO_Port, &GPIO_InitStruct);
 
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+  /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-	if (huart->Instance == USART2) {
-		comms_handle_ow_slave_RxEventCallback(huart, Size);
-	}else if (huart->Instance == USART3){
-		comms_handle_ow_master_RxEventCallback(huart, Size);
+	if (huart->Instance == CALL_IN_UART.Instance) {
+		comms_handle_ow_CallIn_RxEventCallback(huart, Size);
+	}else if(huart->Instance == CALL_OUT_UART.Instance) {
+		comms_handle_ow_CallOut_RxEventCallback(huart, Size);
 	}
 }
 
@@ -1112,10 +1134,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
-	if (huart->Instance == USART2) {
-		comms_handle_ow_slave_TxCpltCallback(huart);
-	}else if (huart->Instance == USART3){
-		comms_handle_ow_master_TxCpltCallback(huart);
+	if(huart->Instance == CALL_OUT_UART.Instance){
+		comms_handle_ow_CallOut_TxCpltCallback(huart);
+	}else if(huart->Instance == CALL_IN_UART.Instance){
+		comms_handle_ow_CallIn_TxCpltCallback(huart);
 	}
 }
 
@@ -1133,17 +1155,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
 
-  if (htim->Instance == TIM14) {
+  if (htim->Instance == CDC_TIMER.Instance) {
 	  CDC_Idle_Timer_Handler();
   }
 
   /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM16) {
+  if (htim->Instance == TIM16)
+  {
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
 
-  if (htim->Instance == TIM17) {
+  if (htim->Instance == RESET_TIMER.Instance) {
       // Stop the timer to prevent re-triggering
       HAL_TIM_Base_Stop_IT(htim);
 
@@ -1156,6 +1179,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	  // Reset the board
 	  NVIC_SystemReset();
   }
+
   /* USER CODE END Callback 1 */
 }
 

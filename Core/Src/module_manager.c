@@ -1,11 +1,18 @@
 #include "module_manager.h"
+#include <stdio.h>
 
 // Internal storage for module information.
 static ModuleInfo modules[MAX_MODULES];
 static uint8_t totalModules = 0;
+static bool _configured = false;
+static uint8_t slave_address = 0;
+static uint8_t module_ID = 0;
+static DEVICE_ROLE my_device_role = ROLE_UNDEFINED;
 
 static void ModuleManager_clear_storage() {
     totalModules = 0;
+    module_ID = 0;
+    slave_address = 0;
     // Clear all module entries.
     for (int i = 0; i < MAX_MODULES; i++) {
         modules[i].i2c_address = 0;
@@ -15,6 +22,7 @@ static void ModuleManager_clear_storage() {
             modules[i].transmitters[j].cs_pin = 0;
         }
     }
+    _configured = false;
 }
 
 uint8_t ModuleManager_GetModuleIndex(uint8_t globalTxIndex) {
@@ -26,14 +34,17 @@ uint8_t ModuleManager_GetLocalTxIndex(uint8_t globalTxIndex) {
 }
 
 void ModuleManager_Init(void) {
+	printf("ModuleManager_Init\r\n");
 	ModuleManager_clear_storage();
 }
 
 void ModuleManager_DeInit(void) {
+	printf("ModuleManager_DeInit\r\n");
 	ModuleManager_clear_storage();
 }
 
 int ModuleManager_RegisterMaster(uint8_t i2c_address) {
+	printf("ModuleManager_RegisterMaster\r\n");
     if (totalModules >= MAX_MODULES) {
         return -1;  // No space available.
     }
@@ -46,6 +57,7 @@ int ModuleManager_RegisterMaster(uint8_t i2c_address) {
 }
 
 int ModuleManager_AddSlave(uint8_t i2c_address) {
+	printf("ModuleManager_AddSlave 0x%02X\r\n", i2c_address);
     if (totalModules >= MAX_MODULES) {
         return -1;  // Maximum number of modules reached.
     }
@@ -74,4 +86,45 @@ TX7332* ModuleManager_GetTransmitter(uint8_t globalTxIndex) {
         return NULL;
     }
     return &mod->transmitters[localTxIndex];
+}
+
+void set_module_ID(uint8_t id) {
+    module_ID = id;
+}
+
+uint8_t get_module_ID() {
+    return module_ID;
+}
+
+uint8_t get_slave_addres() {
+    return slave_address;
+}
+
+void set_slave_address(uint8_t address) {
+	slave_address = address;
+}
+
+DEVICE_ROLE get_device_role()
+{
+	return my_device_role;
+}
+
+void set_device_role(DEVICE_ROLE role)
+{
+	my_device_role = role;
+}
+
+bool get_configured(){
+	if(my_device_role == ROLE_SLAVE && slave_address != 0 && _configured) return true;
+	else if(my_device_role == ROLE_MASTER && _configured) return true;
+
+	return false;
+}
+
+void set_configured(bool configured) {
+	if(_configured == true && configured == false){
+		ModuleManager_clear_storage();
+	}else{
+		_configured = configured;
+	}
 }

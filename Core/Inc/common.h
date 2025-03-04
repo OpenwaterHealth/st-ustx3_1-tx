@@ -11,6 +11,12 @@
 #include <stdint.h>
 
 #define COMMAND_MAX_SIZE 256
+#define ONEWIRE_MAX_SIZE 48
+
+// Configuration: each module has two transmitters; adjust as necessary.
+#define TX_PER_MODULE 2
+#define MAX_MODULES   6  // Total number of modules (master + slaves)
+
 
 typedef enum {
 	OW_START_BYTE = 0xAA,
@@ -37,6 +43,7 @@ typedef enum {
 	OW_CONTROLLER = 0xEA,
 	OW_POWER = 0xEB,
 	OW_ONEWIRE_RESP = 0xEC,
+	OW_TIMEOUT = 0xEE,
 	OW_ERROR = 0xEF,
 } UartPacketTypes;
 
@@ -57,6 +64,7 @@ typedef enum {
 	OW_CMD_HWID = 0x05,
 	OW_CMD_GET_TEMP = 0x06,
 	OW_CMD_GET_AMBIENT = 0x07,
+	OW_CMD_DISCOVERY = 0x0C,
 	OW_CMD_DFU = 0x0D,
 	OW_CMD_NOP = 0x0E,
 	OW_CMD_RESET = 0x0F,

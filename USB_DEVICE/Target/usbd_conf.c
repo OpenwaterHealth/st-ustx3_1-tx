@@ -7,7 +7,7 @@
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2024 STMicroelectronics.
+  * Copyright (c) 2025 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -26,7 +26,9 @@
 #include "usbd_cdc.h"
 
 /* USER CODE BEGIN Includes */
+#include "main.h"
 #include "uart_comms.h"
+#include "module_manager.h"
 
 /* USER CODE END Includes */
 
@@ -41,7 +43,7 @@
 
 PCD_HandleTypeDef hpcd_USB_FS;
 void Error_Handler(void);
-
+extern volatile bool _usb_interrupt_flag;
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
@@ -55,6 +57,7 @@ void Error_Handler(void);
 static USBD_StatusTypeDef USBD_Get_USB_Status(HAL_StatusTypeDef hal_status);
 /* USER CODE BEGIN 1 */
 static void SystemClockConfig_Resume(void);
+
 /* USER CODE END 1 */
 extern void SystemClock_Config(void);
 
@@ -202,7 +205,8 @@ void HAL_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
   if(get_device_role() == ROLE_MASTER)
   {
 	  set_device_role(ROLE_SLAVE);
-	  set_reconfigure();
+	  set_configured(false);
+	  _usb_interrupt_flag = true;
   }
 
   if (hpcd->Init.low_power_enable)
@@ -229,7 +233,8 @@ void HAL_PCD_ResumeCallback(PCD_HandleTypeDef *hpcd)
   if(get_device_role() != ROLE_MASTER)
   {
 	  set_device_role(ROLE_MASTER);
-	  set_reconfigure();
+	  set_configured(false);
+	  _usb_interrupt_flag = true;
   }
 
   if (hpcd->Init.low_power_enable)

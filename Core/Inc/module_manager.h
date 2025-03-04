@@ -14,16 +14,8 @@ extern "C" {
 #endif
 
 #include "main.h"  // Adjust include as needed for your MCU
-
-// Configuration: each module has two transmitters; adjust as necessary.
-#define TX_PER_MODULE 2
-#define MAX_MODULES   6  // Total number of modules (master + slaves)
-
-// Represents a transmitter (TX7332)
-typedef struct {
-    GPIO_TypeDef* cs_port;  // Chip-select port
-    uint16_t cs_pin;        // Chip-select pin
-} TX7332;
+#include "common.h"
+#include "tx7332.h"
 
 // Represents a module (master or slave) that holds TX7332 devices.
 typedef struct {
@@ -92,6 +84,19 @@ ModuleInfo* ModuleManager_GetModule(uint8_t moduleIndex);
  * @return TX7332* Pointer to the transmitter structure, or NULL if not found.
  */
 TX7332* ModuleManager_GetTransmitter(uint8_t globalTxIndex);
+
+
+void set_module_ID(uint8_t id);
+uint8_t get_module_ID();
+
+DEVICE_ROLE get_device_role();
+void set_device_role(DEVICE_ROLE role);
+
+uint8_t get_slave_addres();
+void set_slave_address(uint8_t address);
+
+bool get_configured();
+void set_configured(bool configured);
 
 #ifdef __cplusplus
 }

@@ -18,16 +18,17 @@ void comms_host_check_received(void);
 bool comms_onewire_slave_start(void);
 void comms_onewire_check_received(void);
 bool comms_onewire_master_sendreceive(UartPacket* pSendPacket, UartPacket* pRetPacket);
-void comms_handle_ow_master_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size);
-void comms_handle_ow_master_TxCpltCallback(UART_HandleTypeDef *huart);
-void comms_handle_ow_slave_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size);
-void comms_handle_ow_slave_TxCpltCallback(UART_HandleTypeDef *huart);
-void CDC_handle_TxCpltCallback();
-void set_module_ID(uint8_t id);
-uint8_t get_module_ID();
 
-DEVICE_ROLE get_device_role();
-void set_device_role(DEVICE_ROLE role);
+void comms_handle_ow_CallOut_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size);
+void comms_handle_ow_CallOut_TxCpltCallback(UART_HandleTypeDef *huart);
+
+void comms_handle_ow_CallIn_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size);
+void comms_handle_ow_CallIn_TxCpltCallback(UART_HandleTypeDef *huart);
+
+bool enumerate_slaves(void);
+
+void CDC_handle_TxCpltCallback();
+
 bool configure_master();
 bool configure_slave();
 

@@ -7,37 +7,33 @@
 
 #include "if_commands.h"
 #include "main.h"
-#include "uart_comms.h"
 #include "module_manager.h"
+#include "uart_comms.h"
 #include "utils.h"
 #include <string.h>
 #include "usbd_cdc_if.h"
 
-#define ONEWIRE_TIMEOUT 25
-#define TX_TIMEOUT 25
+#define ONEWIRE_TIMEOUT 1000
+#define TX_TIMEOUT 1000
 
 // Private variables
 uint8_t rxBuffer[COMMAND_MAX_SIZE];
 uint8_t txBuffer[COMMAND_MAX_SIZE];
-uint8_t owBuffer[COMMAND_MAX_SIZE];
-uint8_t owTxBuffer[COMMAND_MAX_SIZE];
+uint8_t owRxBuffer[ONEWIRE_MAX_SIZE];
+uint8_t owTxBuffer[ONEWIRE_MAX_SIZE];
 
 volatile uint32_t ptrReceive;
 volatile uint8_t rx_flag = 0;
 volatile uint8_t tx_flag = 0;
-volatile uint8_t rx_ow_slave_flag = 0;
-volatile uint8_t tx_ow_slave_flag = 0;
-volatile uint8_t rx_ow_master_flag = 0;
-volatile uint8_t tx_ow_master_flag = 0;
+volatile uint8_t rx_ow_callin_flag = 0;
+volatile uint8_t tx_ow_callin_flag = 0;
+volatile uint8_t rx_ow_callout_flag = 0;
+volatile uint8_t tx_ow_callout_flag = 0;
 volatile uint16_t ow_packetid = 0;
 
 static uint16_t ow_packet_count;
 static UartPacket ow_send_packet;
 static UartPacket ow_receive_packet;
-
-static uint8_t module_ID = 0;
-
-static DEVICE_ROLE my_device_role = ROLE_UNDEFINED;
 
 static uint16_t get_ow_next_packetID(){
 	ow_packet_count++;
@@ -169,17 +165,15 @@ static void comms_interface_send(UartPacket* pResp)
         if ((HAL_GetTick() - start_time) >= TX_TIMEOUT)
         {
             // Timeout handling: Log error and break out or reset the flag.
-            // printf("TX Timeout\r\n");
             break;
         }
     }
 }
 
-static bool comms_onewire_send(UartPacket* pResp)
+static bool comms_callout_onewire_send(UartPacket* pResp)
 {
     uint32_t start_time = 0;
     int bufferIndex = 0;
-    uint8_t device_role = get_device_role();
 
     /* Clear the transmission buffer */
     memset(owTxBuffer, 0, sizeof(owTxBuffer));
@@ -215,28 +209,20 @@ static bool comms_onewire_send(UartPacket* pResp)
     /* Append the end byte */
     owTxBuffer[bufferIndex++] = OW_END_BYTE;
 
-    /* Reset the appropriate transmission flag */
-    if(device_role == ROLE_MASTER)
-    {
-        tx_ow_master_flag = 0;
-    }
-    else
-    {
-        tx_ow_slave_flag = 0;
-    }
+    tx_ow_callout_flag = 0;
 
     /* Optional: Print the buffer for debugging */
     // printBuffer(owTxBuffer, pResp->data_len + 12);
 
     /* Enable the transmitter in half-duplex mode */
-    if(HAL_HalfDuplex_EnableTransmitter(&huart3) != HAL_OK)
+    if(HAL_HalfDuplex_EnableTransmitter(&CALL_OUT_UART) != HAL_OK)
     {
         /* Setup Error */
         Error_Handler();
     }
 
     /* Start transmission in interrupt mode */
-    if(HAL_UART_Transmit_IT(&huart3, (uint8_t *)owTxBuffer, bufferIndex) != HAL_OK)
+    if(HAL_UART_Transmit_IT(&CALL_OUT_UART, (uint8_t *)owTxBuffer, bufferIndex) != HAL_OK)
     {
         /* Transmission Error */
         Error_Handler();
@@ -245,77 +231,126 @@ static bool comms_onewire_send(UartPacket* pResp)
     start_time = HAL_GetTick();  // Record the start time
 
     /* Wait for transmission to complete (flag set in the callback) */
-    if(device_role == ROLE_MASTER)
+    while(!tx_ow_callout_flag)
     {
-        while(!tx_ow_master_flag)
-        {
-            if ((HAL_GetTick() - start_time) >= ONEWIRE_TIMEOUT)
-            {
-                // printf("Timed Out\r\n");
-                return false;  // Timeout occurred
-            }
-            // Optionally add a small delay here to yield CPU time.
+        if ((HAL_GetTick() - start_time) >= ONEWIRE_TIMEOUT)
+        {;
+            return false;  // Timeout occurred
         }
-    }
-    else
-    {
-        while(!tx_ow_slave_flag)
-        {
-            if ((HAL_GetTick() - start_time) >= ONEWIRE_TIMEOUT)
-            {
-                // printf("Timed Out\r\n");
-                return false;  // Timeout occurred
-            }
-            // Optionally add a small delay here.
-        }
+        // Optionally add a small delay here to yield CPU time.
     }
 
     return true;
 }
 
-static void comms_onewire_receive(UartPacket* pRetPacket)
+
+static bool comms_callin_onewire_send(UartPacket* pResp)
+{
+    uint32_t start_time = 0;
+    int bufferIndex = 0;
+
+    /* Clear the transmission buffer */
+    memset(owTxBuffer, 0, sizeof(owTxBuffer));
+
+    /* Ensure packet ID is set */
+    if(pResp->id == 0)
+        pResp->id = get_ow_next_packetID();
+
+    /* Build the packet */
+    owTxBuffer[bufferIndex++] = OW_START_BYTE;
+    owTxBuffer[bufferIndex++] = pResp->id >> 8;
+    owTxBuffer[bufferIndex++] = pResp->id & 0xFF;
+    owTxBuffer[bufferIndex++] = pResp->packet_type;
+    owTxBuffer[bufferIndex++] = pResp->command;
+    owTxBuffer[bufferIndex++] = pResp->addr;
+    owTxBuffer[bufferIndex++] = pResp->reserved;
+    owTxBuffer[bufferIndex++] = (pResp->data_len) >> 8;
+    owTxBuffer[bufferIndex++] = (pResp->data_len) & 0xFF;
+
+    /* Check for data payload overflow */
+    if(pResp->data_len > 0)
+    {
+        /* (Optionally, check that bufferIndex + pResp->data_len is within bounds) */
+        memcpy(&owTxBuffer[bufferIndex], pResp->data, pResp->data_len);
+        bufferIndex += pResp->data_len;
+    }
+
+    /* Calculate CRC over the packet (from index 1, covering 8 header bytes + payload) */
+    uint16_t crc = util_crc16(&owTxBuffer[1], pResp->data_len + 8);
+    owTxBuffer[bufferIndex++] = crc >> 8;
+    owTxBuffer[bufferIndex++] = crc & 0xFF;
+
+    /* Append the end byte */
+    owTxBuffer[bufferIndex++] = OW_END_BYTE;
+
+    tx_ow_callin_flag = 0;
+
+    /* Optional: Print the buffer for debugging */
+    // printBuffer(owTxBuffer, pResp->data_len + 12);
+
+    /* Enable the transmitter in half-duplex mode */
+    if(HAL_HalfDuplex_EnableTransmitter(&CALL_IN_UART) != HAL_OK)
+    {
+        /* Setup Error */
+        Error_Handler();
+    }
+
+    /* Start transmission in interrupt mode */
+    if(HAL_UART_Transmit_IT(&CALL_IN_UART, (uint8_t *)owTxBuffer, bufferIndex) != HAL_OK)
+    {
+        /* Transmission Error */
+        Error_Handler();
+    }
+
+    start_time = HAL_GetTick();  // Record the start time
+
+    /* Wait for transmission to complete (flag set in the callback) */
+    while(!tx_ow_callin_flag)
+    {
+        if ((HAL_GetTick() - start_time) >= ONEWIRE_TIMEOUT)
+        {
+            return false;  // Timeout occurred
+        }
+        // Optionally add a small delay here to yield CPU time.
+    }
+
+    return true;
+}
+
+static void comms_callout_onewire_receive(UartPacket* pRetPacket)
 {
     uint32_t start_time = 0;
 
     // Clear the buffer
-    memset(owBuffer, 0, sizeof(owBuffer));
+    memset(owRxBuffer, 0, sizeof(owRxBuffer));
 
     // Clear the flag before starting the reception
-    rx_ow_master_flag = 0;  // Ensure rx_ow_master_flag is declared as volatile
+    rx_ow_callout_flag = 0;  // Ensure rx_ow_callout_flag is declared as volatile
 
     // Enable receiver in half-duplex mode
-    if(HAL_HalfDuplex_EnableReceiver(&huart2) != HAL_OK) {
+    if(HAL_HalfDuplex_EnableReceiver(&CALL_OUT_UART) != HAL_OK) {
         // Receive Error
         Error_Handler();
     }
 
     // Start reception until idle (non-blocking, interrupt-driven)
-    if (HAL_UARTEx_ReceiveToIdle_IT(&huart2, owBuffer, COMMAND_MAX_SIZE) != HAL_OK) {
+    if (HAL_UARTEx_ReceiveToIdle_IT(&CALL_OUT_UART, owRxBuffer, COMMAND_MAX_SIZE) != HAL_OK) {
         // Receive Error
         Error_Handler();
     }
 
     // Start the timeout counter
     start_time = HAL_GetTick();
-    while(!rx_ow_master_flag) {
+    while(!rx_ow_callout_flag) {
         if ((HAL_GetTick() - start_time) >= ONEWIRE_TIMEOUT) {
-            // printf("Timed Out\r\n");
-            pRetPacket->packet_type = OW_ERROR;
+            pRetPacket->packet_type = OW_TIMEOUT;
             pRetPacket->data_len = 0;
             return;  // Timeout occurred
         }
     }
 
     // Process the received data
-    buffer_to_packet(owBuffer, pRetPacket);
-}
-
-void set_module_ID(uint8_t id) {
-    module_ID = id;
-}
-
-uint8_t get_module_ID() {
-    return module_ID;
+    buffer_to_packet(owRxBuffer, pRetPacket);
 }
 
 void comms_host_start(void)
@@ -421,8 +456,6 @@ void comms_host_check_received(void)
     }
 
 	process_if_command(&cmd, &resp);
-	// printf("CMD Packet:\r\n");
-	// print_uart_packet(&cmd);
 
 NextDataPacket:
 	comms_interface_send(&resp);
@@ -436,14 +469,14 @@ void comms_onewire_check_received()
 {
     uint16_t calculated_crc;
 
-	if(!rx_ow_slave_flag) return;
+	if(!rx_ow_callin_flag) return;
 
     memset((void*)&ow_send_packet, 0, sizeof(ow_send_packet));
     memset((void*)&ow_receive_packet, 0, sizeof(ow_receive_packet));
 
     int bufferIndex = 0;
 
-    if(owBuffer[bufferIndex++] != OW_START_BYTE) {
+    if(owRxBuffer[bufferIndex++] != OW_START_BYTE) {
         // Send NACK doesn't have the correct start byte
     	ow_send_packet.id = OW_CMD_NOP;
     	ow_send_packet.data_len = 0;
@@ -453,19 +486,19 @@ void comms_onewire_check_received()
     }
 
 
-    ow_receive_packet.id = (owBuffer[bufferIndex] << 8 | (owBuffer[bufferIndex+1] & 0xFF ));
+    ow_receive_packet.id = (owRxBuffer[bufferIndex] << 8 | (owRxBuffer[bufferIndex+1] & 0xFF ));
     bufferIndex+=2;
-    ow_receive_packet.packet_type = owBuffer[bufferIndex++];
-    ow_receive_packet.command = owBuffer[bufferIndex++];
-    ow_receive_packet.addr = owBuffer[bufferIndex++];
-    ow_receive_packet.reserved = owBuffer[bufferIndex++];
+    ow_receive_packet.packet_type = owRxBuffer[bufferIndex++];
+    ow_receive_packet.command = owRxBuffer[bufferIndex++];
+    ow_receive_packet.addr = owRxBuffer[bufferIndex++];
+    ow_receive_packet.reserved = owRxBuffer[bufferIndex++];
 
     // Extract payload length
-    ow_receive_packet.data_len = (owBuffer[bufferIndex] << 8 | (owBuffer[bufferIndex+1] & 0xFF ));
+    ow_receive_packet.data_len = (owRxBuffer[bufferIndex] << 8 | (owRxBuffer[bufferIndex+1] & 0xFF ));
     bufferIndex+=2;
 
     // Check if data length is valid
-    if (ow_receive_packet.data_len > COMMAND_MAX_SIZE - bufferIndex && owBuffer[COMMAND_MAX_SIZE-1] != OW_END_BYTE) {
+    if (ow_receive_packet.data_len > COMMAND_MAX_SIZE - bufferIndex && owRxBuffer[COMMAND_MAX_SIZE-1] != OW_END_BYTE) {
         // Send NACK response due to no end byte
     	// data can exceed buffersize but every buffer must have a start and end packet
     	// command that will send more data than one buffer will follow with data packets to complete the request
@@ -478,7 +511,7 @@ void comms_onewire_check_received()
     }
 
     // Extract data pointer
-    ow_receive_packet.data = &owBuffer[bufferIndex];
+    ow_receive_packet.data = &owRxBuffer[bufferIndex];
     if (ow_receive_packet.data_len > COMMAND_MAX_SIZE)
     {
     	bufferIndex=COMMAND_MAX_SIZE-3; // [3 bytes from the end should be the crc for a continuation packet]
@@ -487,18 +520,18 @@ void comms_onewire_check_received()
     }
 
     // Extract received CRC
-    ow_receive_packet.crc = (owBuffer[bufferIndex] << 8 | (owBuffer[bufferIndex+1] & 0xFF ));
+    ow_receive_packet.crc = (owRxBuffer[bufferIndex] << 8 | (owRxBuffer[bufferIndex+1] & 0xFF ));
     bufferIndex+=2;
 
     // Calculate CRC for received data
 
     if (ow_receive_packet.data_len > COMMAND_MAX_SIZE)
     {
-    	calculated_crc = util_crc16(&owBuffer[1], COMMAND_MAX_SIZE-3);
+    	calculated_crc = util_crc16(&owRxBuffer[1], COMMAND_MAX_SIZE-3);
     }
     else
     {
-    	calculated_crc = util_crc16(&owBuffer[1], ow_receive_packet.data_len + 8);
+    	calculated_crc = util_crc16(&owRxBuffer[1], ow_receive_packet.data_len + 8);
     }
 
     // Check CRC
@@ -512,50 +545,40 @@ void comms_onewire_check_received()
         goto NextOneWirePacket;
     }
 
-    //print_uart_packet(&ow_receive_packet);
 	process_if_command(&ow_receive_packet, &ow_send_packet);
 
 NextOneWirePacket:
 	HAL_Delay(1);
-	if(!comms_onewire_send(&ow_send_packet))
+	if(!comms_callin_onewire_send(&ow_send_packet))
 	{
-		printf("failed to send onewire response\r\n");
+		// printf("failed to send onewire response\r\n");
 	}
-	memset(owBuffer, 0, sizeof(owBuffer));
-    rx_ow_slave_flag = 0;
-    if(HAL_HalfDuplex_EnableReceiver(&huart2) != HAL_OK) {
+	memset(owRxBuffer, 0, sizeof(owRxBuffer));
+    rx_ow_callin_flag = 0;
+    if(HAL_HalfDuplex_EnableReceiver(&CALL_IN_UART) != HAL_OK) {
     	// Receive Error
 		Error_Handler();
     }
 
-	if (HAL_UARTEx_ReceiveToIdle_IT(&huart2, owBuffer, COMMAND_MAX_SIZE) != HAL_OK) {
+	if (HAL_UARTEx_ReceiveToIdle_IT(&CALL_IN_UART, owRxBuffer, COMMAND_MAX_SIZE) != HAL_OK) {
 		// Receive Error
 		Error_Handler();
 	}
 }
 
-DEVICE_ROLE get_device_role()
-{
-	return my_device_role;
-}
-
-void set_device_role(DEVICE_ROLE role)
-{
-	my_device_role = role;
-}
 bool comms_onewire_slave_start()
 {
 	ow_packet_count = 0;
-	memset(owBuffer, 0, sizeof(owBuffer));
-    rx_ow_slave_flag = 0;
-    tx_ow_slave_flag = 0;
-    HAL_UART_Abort(&huart2);
-    if(HAL_HalfDuplex_EnableReceiver(&huart2) != HAL_OK) {
+	memset(owRxBuffer, 0, sizeof(owRxBuffer));
+    rx_ow_callin_flag = 0;
+    tx_ow_callin_flag = 0;
+    HAL_UART_Abort(&CALL_IN_UART);
+    if(HAL_HalfDuplex_EnableReceiver(&CALL_IN_UART) != HAL_OK) {
     	// Receive Error
 		Error_Handler();
     }
 
-	if (HAL_UARTEx_ReceiveToIdle_IT(&huart2, owBuffer, COMMAND_MAX_SIZE) != HAL_OK) {
+	if (HAL_UARTEx_ReceiveToIdle_IT(&CALL_IN_UART, owRxBuffer, COMMAND_MAX_SIZE) != HAL_OK) {
 		// Receive Error
 		Error_Handler();
 	}
@@ -566,41 +589,17 @@ bool comms_onewire_slave_start()
 bool configure_master()
 {
 	ow_packet_count = 0;
-	bool bRet = false;
+	bool bRet = true;
 	set_module_ID(0);
-    HAL_UART_Abort(&huart3);
-    rx_ow_slave_flag = 0;
-    tx_ow_slave_flag = 0;
-
-    comms_host_start();
+    HAL_UART_Abort(&CALL_OUT_UART);
+    rx_ow_callin_flag = 0;
+    tx_ow_callin_flag = 0;
 
 	// configure master
-	printf("Configured as MASTER\r\n");
-
     ModuleManager_Init();
     // Register the master module
     ModuleManager_RegisterMaster(0x00);
-	printf("Enumerating any attached slave transmitters\r\n");
-	// register found slaves
 
-    memset((void*)&ow_send_packet, 0, sizeof(ow_send_packet));
-
-	ow_send_packet.id = 0; // so it pulls the next id
-	ow_send_packet.packet_type = OW_ONE_WIRE;
-	ow_send_packet.command = OW_CMD_PING;
-
-	if(comms_onewire_send(&ow_send_packet)){
-		comms_onewire_receive(&ow_receive_packet);
-		if(ow_receive_packet.packet_type != OW_ERROR){
-			printf("Onewire txrx success\r\n");
-		}else{
-			printf("Onewire txrx failure\r\n");
-		}
-	}else{
-		printf("Onewire tx failed\r\n");
-	}
-
-	//print_uart_packet(&ow_receive_packet);
 	return bRet;
 }
 
@@ -609,44 +608,102 @@ bool configure_slave()
 	bool bRet = false;
 	CDC_Stop_ReceiveToIdle();
 	ModuleManager_DeInit();
-
+	set_device_role(ROLE_SLAVE);
 	// configure slave
 	comms_onewire_slave_start();
-	printf("Configured as Slave\r\n");
 	return bRet;
 }
 
+#define BASE_I2C_ADDRESS 0x20   // Starting address for slaves
+#define MAX_SLAVES       6      // Maximum number of slaves in the chain
+
+bool enumerate_slaves()
+{
+    uint8_t next_address = BASE_I2C_ADDRESS;
+    uint8_t slave_count = 1;
+    bool bRet = true;
+
+	// register found slaves
+
+    while(slave_count < MAX_SLAVES)
+    {
+        // Clear the send packet structure before use.
+        memset((void*)&ow_send_packet, 0, sizeof(ow_send_packet));
+
+        // Prepare the discovery message.
+        ow_send_packet.packet_type = OW_ONE_WIRE;
+        ow_send_packet.command = OW_CMD_DISCOVERY;
+        ow_send_packet.reserved = slave_count;
+        ow_send_packet.addr = next_address;
+
+        // Send the discovery packet to the current slave.
+        if (comms_callout_onewire_send(&ow_send_packet))
+        {
+            // Wait for a response.
+            comms_callout_onewire_receive(&ow_receive_packet);
+
+			// Check for an error response.
+			if (ow_receive_packet.packet_type != OW_ERROR && ow_receive_packet.packet_type != OW_TIMEOUT)
+			{
+				//printf("Slave found at I2C address 0x%02X\r\n", next_address);
+				// Record the slave if necessary, e.g. store the address.
+				ModuleManager_AddSlave(next_address);
+				slave_count++;
+				next_address++;  // Move on to the next address.
+
+			}
+			else
+			{
+				//printf("Received error from slave at address 0x%02X\r\n", next_address);
+				bRet = false;
+	            break;
+			}
+        }
+        else
+        {
+            //printf("Transmission failed for slave at address 0x%02X\r\n", next_address);
+            bRet = false;
+            break;
+        }
+
+        HAL_Delay(50);
+    }
+
+    return bRet;
+
+}
+
 // Callback functions
-void comms_handle_ow_slave_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
+void comms_handle_ow_CallIn_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
 {
-    if (huart->Instance == USART2) {
+    if (huart->Instance == CALL_IN_UART.Instance) {
         // Notify the task
-    	rx_ow_slave_flag = 1;
+    	rx_ow_callin_flag = 1;
     }
 }
 
-void comms_handle_ow_slave_TxCpltCallback(UART_HandleTypeDef *huart)
+void comms_handle_ow_CallIn_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-    if (huart->Instance == USART2) {
+    if (huart->Instance == CALL_IN_UART.Instance) {
         // Notify the task
-    	tx_ow_slave_flag = 1;
+    	tx_ow_callin_flag = 1;
     }
 }
 
 
-void comms_handle_ow_master_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
+void comms_handle_ow_CallOut_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
 {
-    if (huart->Instance == USART3) {
+    if (huart->Instance == CALL_OUT_UART.Instance) {
         // Notify the task
-    	rx_ow_master_flag = 1;
+    	rx_ow_callout_flag = 1;
     }
 }
 
-void comms_handle_ow_master_TxCpltCallback(UART_HandleTypeDef *huart)
+void comms_handle_ow_CallOut_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-    if (huart->Instance == USART3) {
+    if (huart->Instance == CALL_OUT_UART.Instance) {
         // Notify the task
-    	tx_ow_master_flag = 1;
+    	tx_ow_callout_flag = 1;
     }
 }
 
@@ -661,9 +718,7 @@ void CDC_handle_TxCpltCallback() {
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
 
-    if (huart->Instance == USART2) {
-
-    }else if (huart->Instance == USART3) {
+    if (huart->Instance == CALL_OUT_UART.Instance) {
 
     }
 }
