@@ -8,6 +8,7 @@
 #include "main.h"
 #include "if_commands.h"
 #include "common.h"
+#include "module_manager.h"
 #include "i2c_master.h"
 #include "i2c_protocol.h"
 #include "trigger.h"
@@ -27,13 +28,13 @@ static char retTriggerJson[0xFF];
 volatile float last_temperature = 0;
 volatile float ambient_temperature = 0;
 
-uint8_t receive_afe_status[I2C_STATUS_SIZE] = {0};
-uint8_t receive_afe_buff[I2C_BUFFER_SIZE] = {0};
-uint8_t send_afe_buff[I2C_BUFFER_SIZE] = {0};
+uint8_t send_buff[I2C_BUFFER_SIZE] = {0};
+uint8_t receive_status[I2C_STATUS_SIZE] = {0};
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-static void process_afe_read_status(UartPacket *uartResp, UartPacket* cmd);
-static void process_afe_read(UartPacket *uartResp, UartPacket* cmd);
+
+static void process_i2c_read_status(UartPacket *uartResp, UartPacket* cmd, uint8_t module_id);
+static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t module_id);
 
 static void print_uart_packet(const UartPacket* packet) {
     printf("ID: 0x%04X\r\n", packet->id);
@@ -48,90 +49,81 @@ static void print_uart_packet(const UartPacket* packet) {
     printf("\r\n");
 }
 
-static void process_afe_read(UartPacket *uartResp, UartPacket* cmd)
-{
-	uint16_t rx_len =  cmd->command;
-	// I2C_TX_Packet afe_data_packet;
-	uint8_t slave_addr = cmd->addr;
-	if(found_address_count == 0){
-		// printf("No AFE's found\r\n");
-		uartResp->id = cmd->id;
-		uartResp->packet_type = OW_ERROR;
-		uartResp->command = cmd->command;
-		return;
-	}else{
-		uartResp->id = cmd->id;
-		uartResp->packet_type = cmd->packet_type;
-		uartResp->command = cmd->command;
-		uartResp->data_len = 0;
-	}
 
-	rx_len = read_data_register_of_slave(slave_addr, receive_afe_buff, rx_len);
-	// printf("Received %d Bytes \r\n", rx_len);
-	// printBuffer(receive_afe_buff, rx_len);
-	uartResp->data_len = rx_len;
-	uartResp->data = receive_afe_buff;
-	//i2c_packet_fromBuffer(receive_afe_buff, &afe_data_packet);
-	// i2c_tx_packet_print(&afe_data_packet);
-}
-
-static void process_afe_send(UartPacket *uartResp, UartPacket* cmd)
-{
-	uint16_t send_len = 0;
-	I2C_TX_Packet send_afe_packet;
-	uint8_t slave_addr = cmd->addr;
-	// initialize send packet
-	send_afe_packet.id = cmd->id;
-	send_afe_packet.cmd = cmd->command;
-	send_afe_packet.reserved = cmd->reserved;
-	send_afe_packet.data_len = cmd->data_len;
-
-	if(found_address_count == 0){
-		// printf("No AFE's found\r\n");
-		uartResp->id = cmd->id;
-		uartResp->packet_type = OW_ERROR;
-		uartResp->command = cmd->command;
-		return;
-	}else{
-		uartResp->id = cmd->id;
-		uartResp->command = cmd->command;
-		uartResp->data_len = 0;
-	}
-
-	if(send_afe_packet.data_len==0){
-		send_afe_packet.pData = NULL;
-	}else{
-		send_afe_packet.pData = cmd->data;
-	}
-
-	send_len = i2c_packet_toBuffer(&send_afe_packet, send_afe_buff);
-	send_buffer_to_slave(slave_addr, send_afe_buff, send_len);
-	HAL_Delay(2);
-	process_afe_read_status(uartResp, cmd);
-}
-
-
-static void process_afe_read_status(UartPacket *uartResp, UartPacket* cmd)
+static void process_i2c_read_status(UartPacket *uartResp, UartPacket* cmd, uint8_t module_id)
 {
 	uint16_t rx_len = 0;
-	uint8_t slave_addr = cmd->addr;
-	if(found_address_count == 0){
-		// printf("No AFE's found\r\n");
+	uint8_t slave_addr = ModuleManager_GetModule(module_id)->i2c_address;
+	I2C_STATUS_Packet ret_i2c_status;
+
+	if(module_id == 0){
+		printf("No Module found\r\n");
+		uartResp->id = cmd->id;
+		uartResp->packet_type = OW_ERROR;
+		uartResp->command = cmd->command;
+		uartResp->data_len = 0;
+		uartResp->data = NULL;
+		return;
+	}else{
+		uartResp->id = cmd->id;
+		uartResp->packet_type = OW_ERROR;
+		uartResp->command = cmd->command;
+		uartResp->data_len = 0;
+		uartResp->data = NULL;
+	}
+
+	rx_len = read_status_register_of_slave_global(slave_addr, receive_status, I2C_STATUS_SIZE);
+	printf("Received %d Bytes \r\n", rx_len);
+	if(i2c_status_packet_fromBuffer(receive_status, &ret_i2c_status)){
+		if(ret_i2c_status.status == 0) uartResp->packet_type = OW_RESP;
+	}
+}
+
+static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t module_id)
+{
+	I2C_TX_Packet send_i2c_packet;
+	uint16_t send_len = 0;
+	uint8_t slave_addr = 0;
+	int local_tx_idx = 0;
+
+	printf("Forward to MODULE: %d\r\n", module_id);
+
+	if(module_id == 0){
+		printf("Error called when local\r\n");
 		uartResp->id = cmd->id;
 		uartResp->packet_type = OW_ERROR;
 		uartResp->command = cmd->command;
 		return;
-	}else{
-		uartResp->id = cmd->id;
-		uartResp->packet_type = cmd->packet_type;
-		uartResp->command = cmd->command;
-		uartResp->data_len = 0;
 	}
 
-	rx_len = read_status_register_of_slave(slave_addr, receive_afe_status, I2C_STATUS_SIZE);
-	//printf("Received %d Bytes \r\n", rx_len);
-	uartResp->data_len = rx_len;
-	uartResp->data = receive_afe_status;
+	slave_addr = ModuleManager_GetModule(module_id)->i2c_address;
+	local_tx_idx = cmd->addr - (module_id * TX_PER_MODULE);
+
+	printf("SLAVE: 0x%02X LOCAL TX ID: %d\r\n",slave_addr, local_tx_idx);
+	if(local_tx_idx<0 || local_tx_idx>1){
+		printf("Error invalid txID for slave module: %d tx_id: %d\r\n", module_id, cmd->addr);
+		uartResp->packet_type = OW_ERROR;
+		uartResp->command = cmd->command;
+	}else {
+		// relay to one of the slaves
+		send_i2c_packet.id = cmd->id;
+		send_i2c_packet.cmd = cmd->command;
+		send_i2c_packet.reserved = (uint8_t)local_tx_idx;
+		send_i2c_packet.data_len = cmd->data_len;
+		send_i2c_packet.pData = cmd->data;
+
+	    // i2c_tx_packet_print(&send_i2c_packet);
+
+		send_len = i2c_packet_toBuffer(&send_i2c_packet, send_buff);  // rebuild buffer
+		if(send_buffer_to_slave_global(slave_addr, send_buff, send_len) != 0) { // send buffer to slave
+			printf("Error Sending buffer to slave\r\n");
+			uartResp->packet_type = OW_ERROR;
+		}else{
+			HAL_Delay(250);
+			process_i2c_read_status(uartResp, cmd, module_id);
+		}
+	}
+
 }
 
 static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
@@ -355,6 +347,7 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 
 static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 {
+	uint8_t module_id = 0;
 	uint16_t reg_address = 0;
 	uint32_t reg_value = 0;
 	uint32_t reg_data_buff[REG_DATA_LEN] = {0};
@@ -380,11 +373,16 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
 		uartResp->addr = cmd->addr;
-	    for (int i = 0; i < tx_count; i++) {
-	        write_demo_registers(&tx[i]);
-	    }
+		module_id = ModuleManager_GetModuleIndex(cmd->addr);
 
-		uartResp->reserved = (uint8_t)ARRAY_SIZE(tx);
+		if(module_id == 0x00) // local
+		{
+			write_demo_registers(&tx[cmd->addr]);
+	    }else{
+			process_i2c_forward(uartResp, cmd, module_id);
+		}
+
+		uartResp->reserved = (uint8_t)get_tx_chip_count();
 		break;
 	case OW_TX7332_WREG:
 		uartResp->command = OW_TX7332_WREG;
@@ -392,17 +390,26 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 		uartResp->reserved = 0;
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		if(cmd->data_len != 6 || cmd->addr >= tx_count){
+		if(cmd->data_len != 6 || cmd->addr >= get_tx_chip_count()){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
 
-		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_address = cmd->data[0] | (cmd->data[1] << 8);
-		// Unpack 32-bit value (next 4 bytes, little-endian)
-		reg_value = cmd->data[2] | (cmd->data[3] << 8) | (cmd->data[4] << 16) | (cmd->data[5] << 24);
+		module_id = ModuleManager_GetModuleIndex(cmd->addr);
 
-		TX7332_WriteReg(&tx[cmd->addr], reg_address, reg_value);
+		if(module_id == 0x00) // local
+		{
+			// Unpack 16-bit address (first 2 bytes, little-endian)
+			reg_address = cmd->data[0] | (cmd->data[1] << 8);
+			// Unpack 32-bit value (next 4 bytes, little-endian)
+			reg_value = cmd->data[2] | (cmd->data[3] << 8) | (cmd->data[4] << 16) | (cmd->data[5] << 24);
+
+			TX7332_WriteReg(&tx[cmd->addr], reg_address, reg_value);
+		}
+		else
+		{
+			process_i2c_forward(uartResp, cmd, module_id);
+		}
 
 		break;
 	case OW_TX7332_RREG:
@@ -411,23 +418,30 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 		uartResp->reserved = 0;
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		if(cmd->data_len != 2 || cmd->addr >= tx_count){
+		if(cmd->data_len != 2 || cmd->addr >= get_tx_chip_count()){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
 
-		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_address = cmd->data[0] | (cmd->data[1] << 8);
-		reg_value = 0;
+		module_id = ModuleManager_GetModuleIndex(cmd->addr);
 
-		reg_value = TX7332_ReadReg(&tx[cmd->addr], reg_address);
-		memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
+		if(module_id == 0x00) // local
+		{
+			// Unpack 16-bit address (first 2 bytes, little-endian)
+			reg_address = cmd->data[0] | (cmd->data[1] << 8);
+			reg_value = 0;
 
-		// Package response
-		reg_data_buff[0] = reg_value;
+			reg_value = TX7332_ReadReg(&tx[cmd->addr], reg_address);
+			memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
 
-		uartResp->data_len = sizeof(reg_value);
-		uartResp->data = (uint8_t*)reg_data_buff;
+			// Package response
+			reg_data_buff[0] = reg_value;
+
+			uartResp->data_len = sizeof(reg_value);
+			uartResp->data = (uint8_t*)reg_data_buff;
+		}else{
+			process_i2c_forward(uartResp, cmd, module_id);
+		}
 		break;
 	case OW_TX7332_WBLOCK:
 		uartResp->command = OW_TX7332_WBLOCK;
@@ -435,32 +449,40 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 		uartResp->reserved = 0;
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		if(cmd->data_len <= 6 || cmd->addr >= tx_count){
+		if(cmd->data_len <= 6 || cmd->addr >= get_tx_chip_count()){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
 
-		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_address = cmd->data[0] | (cmd->data[1] << 8);
-		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_count = cmd->data[2];
-		// byte [3] dummy byte
-		// Check if the actual data length matches expected length
-		if(cmd->data_len != (4 + (4 * reg_count)))
+		module_id = ModuleManager_GetModuleIndex(cmd->addr);
+
+		if(module_id == 0x00) // local
 		{
-			// printf("Invalid data size does not match \r\n");
-			uartResp->packet_type = OW_ERROR;
-			break;
+			// Unpack 16-bit address (first 2 bytes, little-endian)
+			reg_address = cmd->data[0] | (cmd->data[1] << 8);
+			// Unpack 16-bit address (first 2 bytes, little-endian)
+			reg_count = cmd->data[2];
+			// byte [3] dummy byte
+			// Check if the actual data length matches expected length
+			if(cmd->data_len != (4 + (4 * reg_count)))
+			{
+				// printf("Invalid data size does not match \r\n");
+				uartResp->packet_type = OW_ERROR;
+				break;
+			}
+
+
+			memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
+
+			memcpy((uint8_t*)reg_data_buff, &cmd->data[4], sizeof(uint32_t) * reg_count);
+			if(!TX7332_WriteBulk(&tx[cmd->addr], reg_address, reg_data_buff, reg_count)){
+				uartResp->packet_type = OW_ERROR;
+				break;
+			}
+		}else{
+			process_i2c_forward(uartResp, cmd, module_id);
 		}
 
-
-		memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
-
-		memcpy((uint8_t*)reg_data_buff, &cmd->data[4], sizeof(uint32_t) * reg_count);
-		if(!TX7332_WriteBulk(&tx[cmd->addr], reg_address, reg_data_buff, reg_count)){
-			uartResp->packet_type = OW_ERROR;
-			break;
-		}
 		break;
 	case OW_TX7332_VWREG:
 		uartResp->command = OW_TX7332_VWREG;
@@ -468,19 +490,26 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 		uartResp->reserved = 0;
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		if(cmd->data_len != 6 || cmd->addr >= tx_count){
+		if(cmd->data_len != 6 || cmd->addr >= get_tx_chip_count()){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
 
-		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_address = cmd->data[0] | (cmd->data[1] << 8);
-		// Unpack 32-bit value (next 4 bytes, little-endian)
-		reg_value = cmd->data[2] | (cmd->data[3] << 8) | (cmd->data[4] << 16) | (cmd->data[5] << 24);
+		module_id = ModuleManager_GetModuleIndex(cmd->addr);
 
-		if(!TX7332_WriteVerify(&tx[cmd->addr], reg_address, reg_value))
+		if(module_id == 0x00) // local
 		{
-			uartResp->packet_type = OW_ERROR;
+			// Unpack 16-bit address (first 2 bytes, little-endian)
+			reg_address = cmd->data[0] | (cmd->data[1] << 8);
+			// Unpack 32-bit value (next 4 bytes, little-endian)
+			reg_value = cmd->data[2] | (cmd->data[3] << 8) | (cmd->data[4] << 16) | (cmd->data[5] << 24);
+
+			if(!TX7332_WriteVerify(&tx[cmd->addr], reg_address, reg_value))
+			{
+				uartResp->packet_type = OW_ERROR;
+			}
+		}else{
+			process_i2c_forward(uartResp, cmd, module_id);
 		}
 
 		break;
@@ -490,31 +519,38 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 		uartResp->reserved = 0;
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		if(cmd->data_len <= 6 || cmd->addr >= tx_count){
+		if(cmd->data_len <= 6 || cmd->addr >= get_tx_chip_count()){
 			uartResp->packet_type = OW_ERROR;
 			break;
 		}
 
-		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_address = cmd->data[0] | (cmd->data[1] << 8);
-		// Unpack 16-bit address (first 2 bytes, little-endian)
-		reg_count = cmd->data[2];
-		// byte [3] dummy byte
-		// Check if the actual data length matches expected length
-		if(cmd->data_len != (4 + (4 * reg_count)))
+		module_id = ModuleManager_GetModuleIndex(cmd->addr);
+
+		if(module_id == 0x00) // local
 		{
-			// printf("Invalid data size does not match \r\n");
-			uartResp->packet_type = OW_ERROR;
-			break;
-		}
+			// Unpack 16-bit address (first 2 bytes, little-endian)
+			reg_address = cmd->data[0] | (cmd->data[1] << 8);
+			// Unpack 16-bit address (first 2 bytes, little-endian)
+			reg_count = cmd->data[2];
+			// byte [3] dummy byte
+			// Check if the actual data length matches expected length
+			if(cmd->data_len != (4 + (4 * reg_count)))
+			{
+				// printf("Invalid data size does not match \r\n");
+				uartResp->packet_type = OW_ERROR;
+				break;
+			}
 
 
-		memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
+			memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
 
-		memcpy((uint8_t*)reg_data_buff, &cmd->data[4], sizeof(uint32_t) * reg_count);
-		if(!TX7332_WriteBulkVerify(&tx[cmd->addr], reg_address, reg_data_buff, reg_count)){
-			uartResp->packet_type = OW_ERROR;
-			break;
+			memcpy((uint8_t*)reg_data_buff, &cmd->data[4], sizeof(uint32_t) * reg_count);
+			if(!TX7332_WriteBulkVerify(&tx[cmd->addr], reg_address, reg_data_buff, reg_count)){
+				uartResp->packet_type = OW_ERROR;
+				break;
+			}
+		}else{
+			process_i2c_forward(uartResp, cmd, module_id);
 		}
 		break;
 	case OW_TX7332_RESET:
@@ -559,15 +595,6 @@ bool process_if_command(UartPacket *cmd, UartPacket *resp)
 		break;
 	case OW_TX7332:
 		TX7332_ProcessCommand(resp, cmd);
-		break;
-	case OW_AFE_STATUS:
-		process_afe_read_status(resp, cmd);
-		break;
-	case OW_AFE_READ:
-		process_afe_read(resp, cmd);
-		break;
-	case OW_AFE_SEND:
-		process_afe_send(resp, cmd);
 		break;
 	default:
 		resp->data_len = 0;

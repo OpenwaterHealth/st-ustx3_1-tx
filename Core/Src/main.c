@@ -349,6 +349,7 @@ int main(void)
 		  HAL_Delay(500);
 		  enumerate_slaves();
 		  set_configured(true);
+		  HAL_Delay(100);
 		  comms_host_start();
 	  }else{
 		  HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
@@ -372,6 +373,7 @@ int main(void)
 			comms_host_check_received(); // check comms
 		}else{
 			comms_onewire_check_received();
+			I2C_Process();
 		}
 	}
 

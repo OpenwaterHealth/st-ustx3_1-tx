@@ -13,6 +13,7 @@
 
 #include "main.h"
 #include "common.h"
+#include "if_commands.h"
 #include "i2c_protocol.h"
 #include "i2c_slave.h"
 #include "utils.h"
@@ -27,6 +28,9 @@ uint8_t tx_position = 0;  // 0 - status, 8 - data packet
 size_t tx_bytes = 0;
 static uint8_t* send_buffer = 0;
 I2C_TX_Packet* data_available;
+
+I2C_TX_Packet ret_data;
+uint8_t rec_data_buffer[128] = {0};
 
 I2C_TX_Packet tx_packet;
 I2C_TX_Packet rx_packet;
@@ -87,6 +91,59 @@ void i2c_print_info() {
 
 
 void I2C_Process() {
+	if (!data_available) return;
+
+	UartPacket new_cmd;
+	UartPacket resp;
+
+	memset(rec_data_buffer, 0, 128);
+
+	// convert command
+	new_cmd.id = data_available->id;
+
+	new_cmd.command = data_available->cmd;
+	new_cmd.addr = data_available->reserved;
+	new_cmd.data_len = data_available->data_len;
+	new_cmd.data = rec_data_buffer;
+	if(data_available->pkt_len>0){
+		memcpy(new_cmd.data, data_available->pData, data_available->data_len);
+	}
+
+
+	// Process command
+	status_packet->id = data_available->id;
+	status_packet->cmd = data_available->cmd;
+	status_packet->status = 0xFF;
+	status_packet->data_len = 0;
+
+	data_available = NULL;
+
+	if((new_cmd.command & 0xF0) == 0x20)
+	{
+		new_cmd.packet_type = OW_TX7332;
+	}
+	else if((new_cmd.command & 0xF0) == 0x00)
+	{
+		new_cmd.packet_type = OW_CMD;
+	}
+	else
+	{
+		// error
+		new_cmd.packet_type = OW_ERROR;
+	}
+
+	process_if_command(&new_cmd, &resp);
+
+	// convert response to i2c return
+	if(resp.packet_type != OW_ERROR)
+	{
+		status_packet->status = OW_SUCCESS;
+	}
+	else
+	{
+		status_packet->status = OW_ERROR;
+	}
+	set_transmit_buffer(NULL, data_available->id, data_available->cmd, status_packet->status);
 
 }
 
