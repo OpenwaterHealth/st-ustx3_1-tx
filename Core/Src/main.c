@@ -89,7 +89,7 @@ DMA_HandleTypeDef hdma_usart3_tx;
 
 int tx_count = 2;
 TX7332 tx[2];
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 5};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 6};
 uint32_t id_words[3] = {0};
 
 volatile bool _enter_dfu = false;
