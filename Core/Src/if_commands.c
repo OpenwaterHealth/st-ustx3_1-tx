@@ -10,6 +10,7 @@
 #include "common.h"
 #include "module_manager.h"
 #include "i2c_master.h"
+#include "i2c_slave.h"
 #include "i2c_protocol.h"
 #include "trigger.h"
 #include "tx7332.h"
@@ -17,11 +18,14 @@
 #include "thermistor.h"
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 
 extern uint8_t FIRMWARE_VERSION_DATA[3];
-extern TX7332 tx[2];
+extern bool _enter_dfu;
+
 extern int tx_count;
+extern TX7332 transmitters[2];
 
 static uint32_t id_words[3] = {0};
 static char retTriggerJson[0xFF];
@@ -184,6 +188,33 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			uartResp->command = cmd->command;
 			uartResp->data_len = 4;
 			uartResp->data = (uint8_t *)&ambient_temperature;
+			break;
+		case OW_CMD_DISCOVERY:
+			uartResp->id = cmd->id;
+			uartResp->command = cmd->command;
+			if(cmd->reserved==0 || cmd->addr < 0x20 || cmd->addr > 0x25){
+				printf("Error reserved or addr wrong\r\n");
+				uartResp->packet_type = OW_ERROR;
+				break;
+			}
+
+			if(get_configured() && get_module_ID() != 0) {
+				// relay to next slave if it exists
+				printf("discovery timeout\r\n");
+				uartResp->packet_type = OW_TIMEOUT;
+				break;
+			}
+
+			set_configured(true);
+			set_module_ID(cmd->reserved);
+			set_slave_address(cmd->addr);
+			break;
+		case OW_CMD_RESET:
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			uartResp->data_len = 0;
+			break;
 		default:
 			uartResp->addr = 0;
 			uartResp->reserved = 0;
@@ -193,8 +224,6 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			break;
 	}
 }
-
-extern volatile bool _enter_dfu;
 
 static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 {
@@ -364,7 +393,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 		uartResp->addr = cmd->addr;
 		// Here we will have the array for all tx chips with 0,1 on the controller
 		// and 2,3 on the first slave in the chain and so on
-		uartResp->reserved = (uint8_t)ARRAY_SIZE(tx);
+		uartResp->reserved = (uint8_t)get_tx_chip_count();
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
 		break;
@@ -377,7 +406,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 
 		if(module_id == 0x00) // local
 		{
-			write_demo_registers(&tx[cmd->addr]);
+			write_demo_registers(&transmitters[cmd->addr]);
 	    }else{
 			process_i2c_forward(uartResp, cmd, module_id);
 		}
@@ -404,7 +433,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			// Unpack 32-bit value (next 4 bytes, little-endian)
 			reg_value = cmd->data[2] | (cmd->data[3] << 8) | (cmd->data[4] << 16) | (cmd->data[5] << 24);
 
-			TX7332_WriteReg(&tx[cmd->addr], reg_address, reg_value);
+			TX7332_WriteReg(&transmitters[cmd->addr], reg_address, reg_value);
 		}
 		else
 		{
@@ -431,7 +460,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			reg_address = cmd->data[0] | (cmd->data[1] << 8);
 			reg_value = 0;
 
-			reg_value = TX7332_ReadReg(&tx[cmd->addr], reg_address);
+			reg_value = TX7332_ReadReg(&transmitters[cmd->addr], reg_address);
 			memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
 
 			// Package response
@@ -475,7 +504,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
 
 			memcpy((uint8_t*)reg_data_buff, &cmd->data[4], sizeof(uint32_t) * reg_count);
-			if(!TX7332_WriteBulk(&tx[cmd->addr], reg_address, reg_data_buff, reg_count)){
+			if(!TX7332_WriteBulk(&transmitters[cmd->addr], reg_address, reg_data_buff, reg_count)){
 				uartResp->packet_type = OW_ERROR;
 				break;
 			}
@@ -504,7 +533,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			// Unpack 32-bit value (next 4 bytes, little-endian)
 			reg_value = cmd->data[2] | (cmd->data[3] << 8) | (cmd->data[4] << 16) | (cmd->data[5] << 24);
 
-			if(!TX7332_WriteVerify(&tx[cmd->addr], reg_address, reg_value))
+			if(!TX7332_WriteVerify(&transmitters[cmd->addr], reg_address, reg_value))
 			{
 				uartResp->packet_type = OW_ERROR;
 			}
@@ -545,7 +574,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			memset(reg_data_buff,0,REG_DATA_LEN*sizeof(reg_value));
 
 			memcpy((uint8_t*)reg_data_buff, &cmd->data[4], sizeof(uint32_t) * reg_count);
-			if(!TX7332_WriteBulkVerify(&tx[cmd->addr], reg_address, reg_data_buff, reg_count)){
+			if(!TX7332_WriteBulkVerify(&transmitters[cmd->addr], reg_address, reg_data_buff, reg_count)){
 				uartResp->packet_type = OW_ERROR;
 				break;
 			}
@@ -606,4 +635,3 @@ bool process_if_command(UartPacket *cmd, UartPacket *resp)
 	return true;
 
 }
-

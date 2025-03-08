@@ -22,10 +22,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#ifndef USE_USB2ANY
 #include "i2c_master.h"
 #include "config_CDCE6214_64MHZ.h"
-#endif
 
 #include "tx7332.h"
 #include "usbd_cdc_if.h"
@@ -87,13 +85,13 @@ DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
 
-int tx_count = 2;
-TX7332 tx[2];
 uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 6};
 uint32_t id_words[3] = {0};
 
+
 volatile bool _enter_dfu = false;
 volatile bool _usb_interrupt_flag = false;
+TX7332 transmitters[TX_PER_MODULE];
 
 /* USER CODE END PV */
 
@@ -144,20 +142,24 @@ void SetPinsHighImpedance(void)
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(HW_SW_CTRL_GPIO_Port, &GPIO_InitStruct);
-#if USE_USB2ANY
-// I2C local disable for testing with usb2any
-    GPIO_InitStruct.Pin = LOCAL_SCL_Pin;
+
+    // De-initialize the REF_SEL pin
+    HAL_GPIO_DeInit(TRIGGER_GPIO_Port, TRIGGER_Pin);
+
+    // Configure REF_SEL pin to high impedance (input mode, no pull-up, no pull-down)
+    GPIO_InitStruct.Pin = TRIGGER_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(LOCAL_SCL_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(TRIGGER_GPIO_Port, &GPIO_InitStruct);
 
+    // De-initialize the REF_SEL pin
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_8);
 
-    GPIO_InitStruct.Pin = LOCAL_SDA_Pin;
+    // Configure 2MHz pin to high impedance (input mode, no pull-up, no pull-down)
+    GPIO_InitStruct.Pin = GPIO_PIN_8;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(LOCAL_SDA_GPIO_Port, &GPIO_InitStruct);
-}
-#else
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
 
 static bool ConfigureClock()
@@ -201,7 +203,6 @@ static bool ConfigureClock()
 
   return true;
 }
-#endif
 
 /* USER CODE END 0 */
 
@@ -289,9 +290,9 @@ int main(void)
   HAL_Delay(25);
 
   // configure CS for TX7332
-  TX7332_Init(&tx[0], TX1_CS_GPIO_Port, TX1_CS_Pin);
-  TX7332_Init(&tx[1], TX2_CS_GPIO_Port, TX2_CS_Pin);
-  HAL_Delay(10);
+  TX7332_Init(&transmitters[0], TX1_CS_GPIO_Port, TX1_CS_Pin);
+  TX7332_Init(&transmitters[1], TX2_CS_GPIO_Port, TX2_CS_Pin);
+  HAL_Delay(100);
 
   HAL_GPIO_WritePin(TX_CW_EN_GPIO_Port, TX_CW_EN_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(TR1_EN_GPIO_Port, TR1_EN_Pin, GPIO_PIN_SET);
@@ -327,7 +328,7 @@ int main(void)
 		  init_trigger_pulse(&htim15, TIM_CHANNEL_2);
 		  HAL_Delay(1);
 		  deinit_trigger_pulse(&htim15, TIM_CHANNEL_2);
-
+		  MX_TIM1_Init();
 		  // 2MHz reference signal
 		  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 		  HAL_Delay(25);
@@ -359,6 +360,9 @@ int main(void)
 			uint8_t my_slave_address = get_slave_addres();
 			if(my_slave_address>=0x20){
 				I2C_Slave_Init(my_slave_address);
+				HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
+				HAL_Delay(25);
+				ConfigureClock();
 			}
 			HAL_Delay(1);
 		  }
