@@ -90,10 +90,7 @@ static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t m
 	uint8_t slave_addr = 0;
 	int local_tx_idx = 0;
 
-	printf("Forward to MODULE: %d\r\n", module_id);
-
 	if(module_id == 0){
-		printf("Error called when local\r\n");
 		uartResp->id = cmd->id;
 		uartResp->packet_type = OW_ERROR;
 		uartResp->command = cmd->command;
@@ -103,9 +100,7 @@ static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t m
 	slave_addr = ModuleManager_GetModule(module_id)->i2c_address;
 	local_tx_idx = cmd->addr - (module_id * TX_PER_MODULE);
 
-	printf("SLAVE: 0x%02X LOCAL TX ID: %d\r\n",slave_addr, local_tx_idx);
 	if(local_tx_idx<0 || local_tx_idx>1){
-		printf("Error invalid txID for slave module: %d tx_id: %d\r\n", module_id, cmd->addr);
 		uartResp->packet_type = OW_ERROR;
 		uartResp->command = cmd->command;
 	}else {
@@ -120,7 +115,6 @@ static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t m
 
 		send_len = i2c_packet_toBuffer(&send_i2c_packet, send_buff);  // rebuild buffer
 		if(send_buffer_to_slave_global(slave_addr, send_buff, send_len) != 0) { // send buffer to slave
-			printf("Error Sending buffer to slave\r\n");
 			uartResp->packet_type = OW_ERROR;
 		}else{
 			HAL_Delay(250);

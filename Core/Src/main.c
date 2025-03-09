@@ -162,6 +162,57 @@ void SetPinsHighImpedance(void)
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
 
+bool AreAllSlavesReady(void)
+{
+    return HAL_GPIO_ReadPin(RST_GPIO_Port, RST_Pin) == GPIO_PIN_SET;
+}
+
+void WaitForAllSlavesReady(void)
+{
+    while (!AreAllSlavesReady())
+    {
+        printf("Waiting for all slaves to be ready...\n");
+        HAL_Delay(100);  // Delay for stability
+    }
+
+    printf("All slaves are ready!\n");
+}
+
+void SetSlaveReadyState(bool ready)
+{
+    if (ready)
+    {
+        HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);  // Hi-Z (Ready)
+    }
+    else
+    {
+        HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_RESET); // Drive LOW (Not Ready)
+    }
+}
+
+void ConfigureResetPin(bool master)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+	// De-initialize the REF_SEL pin
+	HAL_GPIO_DeInit(RST_GPIO_Port, RST_Pin);
+
+    if(master){
+        // Configure PA9 as INPUT with Pull-up
+        GPIO_InitStruct.Pin = RST_Pin;
+        GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+        GPIO_InitStruct.Pull = GPIO_PULLUP;
+        HAL_GPIO_Init(RST_GPIO_Port, &GPIO_InitStruct);
+    }else{
+        // Configure PA9 as open-drain output (Hi-Z when ready)
+        GPIO_InitStruct.Pin = RST_Pin;
+        GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;  // No internal pull-up
+        HAL_GPIO_Init(RST_GPIO_Port, &GPIO_InitStruct);
+        SetSlaveReadyState(false);
+    }
+
+}
+
 static bool ConfigureClock()
 {
 
@@ -193,16 +244,18 @@ static bool ConfigureClock()
     }
     HAL_Delay(1);
   }
-  HAL_Delay(100);
+  HAL_Delay(50);
   I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1110);
-  HAL_Delay(100);
+  HAL_Delay(50);
   I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1100);
-  HAL_Delay(50);
+  HAL_Delay(10);
   I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1000);
-  HAL_Delay(50);
+  HAL_Delay(10);
 
   return true;
 }
+
+
 
 /* USER CODE END 0 */
 
@@ -214,6 +267,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+
   uint32_t last_toggle_time = HAL_GetTick(); // Store the initial time
   uint32_t current_time = 0;
 
@@ -292,7 +346,7 @@ int main(void)
   // configure CS for TX7332
   TX7332_Init(&transmitters[0], TX1_CS_GPIO_Port, TX1_CS_Pin);
   TX7332_Init(&transmitters[1], TX2_CS_GPIO_Port, TX2_CS_Pin);
-  HAL_Delay(100);
+  HAL_Delay(50);
 
   HAL_GPIO_WritePin(TX_CW_EN_GPIO_Port, TX_CW_EN_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(TR1_EN_GPIO_Port, TR1_EN_Pin, GPIO_PIN_SET);
@@ -303,8 +357,7 @@ int main(void)
   HAL_GPIO_WritePin(TR6_EN_GPIO_Port, TR6_EN_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TR7_EN_GPIO_Port, TR7_EN_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TR8_EN_GPIO_Port, TR8_EN_Pin, GPIO_PIN_SET);
-
-  HAL_Delay(100);
+  HAL_Delay(50);
 
   // system entering ready state
   HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
@@ -323,6 +376,7 @@ int main(void)
 	if(!get_configured()) {
 	  // start listen
 	  if(get_device_role()==ROLE_MASTER){
+		  ConfigureResetPin(true);
 		  configure_master();
 		  // configure PWM for trigger pulse
 		  init_trigger_pulse(&htim15, TIM_CHANNEL_2);
@@ -331,37 +385,35 @@ int main(void)
 		  MX_TIM1_Init();
 		  // 2MHz reference signal
 		  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-		  HAL_Delay(25);
+		  HAL_Delay(10);
 
 		  // clock chip setup
 		  HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
-		  HAL_Delay(25);
+		  HAL_Delay(10);
 		  ConfigureClock();
 
 	  }else{
+		  ConfigureResetPin(false);
 		  configure_slave();
-		  //printf("Waiting on i2c address...\r\n");
+		  SetSlaveReadyState(true);
 	  }
-	  HAL_Delay(250);
+	  HAL_Delay(100);
 	  if(get_device_role()==ROLE_MASTER){
-		  HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_RESET);
-		  HAL_Delay(200);
-		  HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
-		  HAL_Delay(500);
+		  WaitForAllSlavesReady();
 		  enumerate_slaves();
 		  set_configured(true);
 		  HAL_Delay(100);
+		  I2C_scan_global();
 		  comms_host_start();
 	  }else{
-		  HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
 		  while(!get_configured() && !_usb_interrupt_flag)
 		  {
 			comms_onewire_check_received();
 			uint8_t my_slave_address = get_slave_addres();
 			if(my_slave_address>=0x20){
-				I2C_Slave_Init(my_slave_address);
 				HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
-				HAL_Delay(25);
+				I2C_Slave_Init(my_slave_address);
+				HAL_Delay(5);
 				ConfigureClock();
 			}
 			HAL_Delay(1);

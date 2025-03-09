@@ -12,7 +12,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-void I2C_scan(void);
+void I2C_scan_local(void);
+void I2C_scan_global(void);
 uint8_t send_buffer_to_slave_global(uint8_t slave_addr, uint8_t* pBuffer, uint16_t buf_len);
 uint8_t send_buffer_to_slave_local(uint8_t slave_addr, uint8_t* pBuffer, uint16_t buf_len);
 uint8_t read_status_register_of_slave_local(uint8_t slave_addr, uint8_t* pBuffer, uint16_t max_len);

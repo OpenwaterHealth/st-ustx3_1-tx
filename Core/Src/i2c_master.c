@@ -19,7 +19,7 @@ uint8_t selected_slave = 0xFF;
 uint8_t found_address_count = 0;
 uint8_t found_addresses[MAX_FOUND_ADDRESSES];
 
-void I2C_scan(void)
+void I2C_scan_local(void)
 {
     // Reset the global array and counter
     memset(found_addresses, 0, MAX_FOUND_ADDRESSES );
@@ -43,6 +43,29 @@ void I2C_scan(void)
 
 }
 
+void I2C_scan_global(void)
+{
+    // Reset the global array and counter
+    memset(found_addresses, 0, MAX_FOUND_ADDRESSES );
+    found_address_count = 0;
+
+    for (uint8_t address = 0x0; address < 0x7f; address++) {
+        HAL_StatusTypeDef status;
+        status = HAL_I2C_IsDeviceReady(&GLOBAL_I2C_DEVICE, address << 1, 2, 200); // Address shift left by 1 for read/write bit
+        if (status == HAL_OK) {
+            found_addresses[found_address_count] = address;
+            found_address_count++;
+        	printf("%2x ", address);
+        }else{
+        	printf("-- ");
+        }
+        if (address > 0 && (address + 1) % 16 == 0) printf("\r\n");
+    }
+
+    printf("\r\n\r\n");
+    fflush(stdout);
+
+}
 uint8_t send_buffer_to_slave_local(uint8_t slave_addr, uint8_t* pBuffer, uint16_t buf_len)
 {
 	// Check if the I2C handle is valid
@@ -71,10 +94,10 @@ uint8_t send_buffer_to_slave_global(uint8_t slave_addr, uint8_t* pBuffer, uint16
     }
 
 	// printf("===> Sending Packet %d Bytes\r\n", buf_len);
-    if(HAL_I2C_Master_Transmit(&GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), pBuffer, buf_len, HAL_MAX_DELAY)!= HAL_OK)
+    if(HAL_I2C_Master_Transmit(&GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), pBuffer, buf_len, 100)!= HAL_OK)
 	{
         /* Error_Handler() function is called when error occurs. */
-        Error_Handler();
+        return 2; // timeout
 	}
 
 

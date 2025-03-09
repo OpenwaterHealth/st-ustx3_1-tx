@@ -58,6 +58,7 @@ void TIM14_IRQHandler(void);
 void TIM16_IRQHandler(void);
 void TIM17_IRQHandler(void);
 void I2C1_IRQHandler(void);
+void I2C2_IRQHandler(void);
 void USART2_IRQHandler(void);
 void USART3_4_IRQHandler(void);
 void USB_IRQHandler(void);
