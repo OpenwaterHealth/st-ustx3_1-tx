@@ -143,16 +143,16 @@ void SetPinsHighImpedance(void)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(HW_SW_CTRL_GPIO_Port, &GPIO_InitStruct);
 
-    // De-initialize the REF_SEL pin
+    // De-initialize the TRIGGER pin
     HAL_GPIO_DeInit(TRIGGER_GPIO_Port, TRIGGER_Pin);
 
-    // Configure REF_SEL pin to high impedance (input mode, no pull-up, no pull-down)
+    // Configure TRIGGER pin to high impedance (input mode, no pull-up, no pull-down)
     GPIO_InitStruct.Pin = TRIGGER_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(TRIGGER_GPIO_Port, &GPIO_InitStruct);
 
-    // De-initialize the REF_SEL pin
+    // De-initialize the the 2MHz reference signal pin
     HAL_GPIO_DeInit(GPIOA, GPIO_PIN_8);
 
     // Configure 2MHz pin to high impedance (input mode, no pull-up, no pull-down)
@@ -160,6 +160,25 @@ void SetPinsHighImpedance(void)
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // De-initialize the INT pin
+    HAL_GPIO_DeInit(INT_GPIO_Port, INT_Pin);
+
+    // Configure INT pin to high impedance (input mode, no pull-up, no pull-down)
+    GPIO_InitStruct.Pin = INT_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(INT_GPIO_Port, &GPIO_InitStruct);
+
+    // De-initialize the ESTOP pin
+    HAL_GPIO_DeInit(ESTOP_GPIO_Port, ESTOP_Pin);
+
+    // Configure INT pin to high impedance (input mode, no pull-up, no pull-down)
+    GPIO_InitStruct.Pin = ESTOP_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(ESTOP_GPIO_Port, &GPIO_InitStruct);
+
 }
 
 bool AreAllSlavesReady(void)
