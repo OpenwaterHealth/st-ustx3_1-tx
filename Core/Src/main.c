@@ -22,10 +22,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#ifndef USE_USB2ANY
 #include "i2c_master.h"
 #include "config_CDCE6214_64MHZ.h"
-#endif
 
 #include "tx7332.h"
 #include "usbd_cdc_if.h"
@@ -87,13 +85,13 @@ DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
 
-int tx_count = 2;
-TX7332 tx[2];
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 5};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 7};
 uint32_t id_words[3] = {0};
+
 
 volatile bool _enter_dfu = false;
 volatile bool _usb_interrupt_flag = false;
+TX7332 transmitters[TX_PER_MODULE];
 
 /* USER CODE END PV */
 
@@ -144,20 +142,94 @@ void SetPinsHighImpedance(void)
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(HW_SW_CTRL_GPIO_Port, &GPIO_InitStruct);
-#if USE_USB2ANY
-// I2C local disable for testing with usb2any
-    GPIO_InitStruct.Pin = LOCAL_SCL_Pin;
+
+    // De-initialize the TRIGGER pin
+    HAL_GPIO_DeInit(TRIGGER_GPIO_Port, TRIGGER_Pin);
+
+    // Configure TRIGGER pin to high impedance (input mode, no pull-up, no pull-down)
+    GPIO_InitStruct.Pin = TRIGGER_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(LOCAL_SCL_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(TRIGGER_GPIO_Port, &GPIO_InitStruct);
 
+    // De-initialize the the 2MHz reference signal pin
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_8);
 
-    GPIO_InitStruct.Pin = LOCAL_SDA_Pin;
+    // Configure 2MHz pin to high impedance (input mode, no pull-up, no pull-down)
+    GPIO_InitStruct.Pin = GPIO_PIN_8;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(LOCAL_SDA_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // De-initialize the INT pin
+    HAL_GPIO_DeInit(INT_GPIO_Port, INT_Pin);
+
+    // Configure INT pin to high impedance (input mode, no pull-up, no pull-down)
+    GPIO_InitStruct.Pin = INT_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(INT_GPIO_Port, &GPIO_InitStruct);
+
+    // De-initialize the ESTOP pin
+    HAL_GPIO_DeInit(ESTOP_GPIO_Port, ESTOP_Pin);
+
+    // Configure INT pin to high impedance (input mode, no pull-up, no pull-down)
+    GPIO_InitStruct.Pin = ESTOP_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(ESTOP_GPIO_Port, &GPIO_InitStruct);
+
 }
-#else
+
+bool AreAllSlavesReady(void)
+{
+    return HAL_GPIO_ReadPin(RST_GPIO_Port, RST_Pin) == GPIO_PIN_SET;
+}
+
+void WaitForAllSlavesReady(void)
+{
+    while (!AreAllSlavesReady())
+    {
+        printf("Waiting for all slaves to be ready...\n");
+        HAL_Delay(100);  // Delay for stability
+    }
+
+    printf("All slaves are ready!\n");
+}
+
+void SetSlaveReadyState(bool ready)
+{
+    if (ready)
+    {
+        HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);  // Hi-Z (Ready)
+    }
+    else
+    {
+        HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_RESET); // Drive LOW (Not Ready)
+    }
+}
+
+void ConfigureResetPin(bool master)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+	// De-initialize the REF_SEL pin
+	HAL_GPIO_DeInit(RST_GPIO_Port, RST_Pin);
+
+    if(master){
+        // Configure PA9 as INPUT with Pull-up
+        GPIO_InitStruct.Pin = RST_Pin;
+        GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+        GPIO_InitStruct.Pull = GPIO_PULLUP;
+        HAL_GPIO_Init(RST_GPIO_Port, &GPIO_InitStruct);
+    }else{
+        // Configure PA9 as open-drain output (Hi-Z when ready)
+        GPIO_InitStruct.Pin = RST_Pin;
+        GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;  // No internal pull-up
+        HAL_GPIO_Init(RST_GPIO_Port, &GPIO_InitStruct);
+        SetSlaveReadyState(false);
+    }
+
 }
 
 static bool ConfigureClock()
@@ -191,17 +263,18 @@ static bool ConfigureClock()
     }
     HAL_Delay(1);
   }
-  HAL_Delay(100);
+  HAL_Delay(50);
   I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1110);
-  HAL_Delay(100);
+  HAL_Delay(50);
   I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1100);
-  HAL_Delay(50);
+  HAL_Delay(10);
   I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1000);
-  HAL_Delay(50);
+  HAL_Delay(10);
 
   return true;
 }
-#endif
+
+
 
 /* USER CODE END 0 */
 
@@ -213,6 +286,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+
   uint32_t last_toggle_time = HAL_GetTick(); // Store the initial time
   uint32_t current_time = 0;
 
@@ -245,7 +319,6 @@ int main(void)
   MX_TIM15_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
-  MX_USB_DEVICE_Init();
   MX_CRC_Init();
   MX_RTC_Init();
   MX_TIM14_Init();
@@ -289,9 +362,9 @@ int main(void)
   HAL_Delay(25);
 
   // configure CS for TX7332
-  TX7332_Init(&tx[0], TX1_CS_GPIO_Port, TX1_CS_Pin);
-  TX7332_Init(&tx[1], TX2_CS_GPIO_Port, TX2_CS_Pin);
-  HAL_Delay(10);
+  TX7332_Init(&transmitters[0], TX1_CS_GPIO_Port, TX1_CS_Pin);
+  TX7332_Init(&transmitters[1], TX2_CS_GPIO_Port, TX2_CS_Pin);
+  HAL_Delay(50);
 
   HAL_GPIO_WritePin(TX_CW_EN_GPIO_Port, TX_CW_EN_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(TR1_EN_GPIO_Port, TR1_EN_Pin, GPIO_PIN_SET);
@@ -302,12 +375,14 @@ int main(void)
   HAL_GPIO_WritePin(TR6_EN_GPIO_Port, TR6_EN_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TR7_EN_GPIO_Port, TR7_EN_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TR8_EN_GPIO_Port, TR8_EN_Pin, GPIO_PIN_SET);
-
-  HAL_Delay(100);
+  HAL_Delay(50);
 
   // system entering ready state
   HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
 
+
+  HAL_Delay(250);
+  MX_USB_DEVICE_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -322,42 +397,46 @@ int main(void)
 	if(!get_configured()) {
 	  // start listen
 	  if(get_device_role()==ROLE_MASTER){
+		  ConfigureResetPin(true);
 		  configure_master();
 		  // configure PWM for trigger pulse
 		  init_trigger_pulse(&htim15, TIM_CHANNEL_2);
 		  HAL_Delay(1);
 		  deinit_trigger_pulse(&htim15, TIM_CHANNEL_2);
-
+		  MX_TIM1_Init();
 		  // 2MHz reference signal
 		  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-		  HAL_Delay(25);
+		  HAL_Delay(10);
 
 		  // clock chip setup
 		  HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
-		  HAL_Delay(25);
+		  HAL_Delay(10);
 		  ConfigureClock();
 
 	  }else{
+		  ConfigureResetPin(false);
 		  configure_slave();
-		  //printf("Waiting on i2c address...\r\n");
+		  SetSlaveReadyState(true);
 	  }
-	  HAL_Delay(250);
+	  HAL_Delay(100);
 	  if(get_device_role()==ROLE_MASTER){
-		  HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_RESET);
-		  HAL_Delay(200);
-		  HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
-		  HAL_Delay(500);
+		  WaitForAllSlavesReady();
 		  enumerate_slaves();
 		  set_configured(true);
+		  HAL_Delay(100);
+		  I2C_scan_global();
+
 		  comms_host_start();
 	  }else{
-		  HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
 		  while(!get_configured() && !_usb_interrupt_flag)
 		  {
 			comms_onewire_check_received();
 			uint8_t my_slave_address = get_slave_addres();
 			if(my_slave_address>=0x20){
+				HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
 				I2C_Slave_Init(my_slave_address);
+				HAL_Delay(5);
+				ConfigureClock();
 			}
 			HAL_Delay(1);
 		  }
@@ -372,6 +451,7 @@ int main(void)
 			comms_host_check_received(); // check comms
 		}else{
 			comms_onewire_check_received();
+			I2C_Process();
 		}
 	}
 
@@ -1141,6 +1221,15 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
 	}
 }
 
+void delay_ms(uint32_t ms)
+{
+	printf("Clock: %ld\r\n", SystemCoreClock);
+    uint32_t delay_cycles = (SystemCoreClock / 1000) * ms;
+    while (delay_cycles--) {
+        __NOP();  // Ensures the loop doesn't get optimized away
+    }
+}
+
 /* USER CODE END 4 */
 
 /**
@@ -1175,6 +1264,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		// 16k SRAM in address 0x2000 0000 - 0x2000 3FFF
 		*((unsigned long *)0x20003FF0) = 0xDEADBEEF;
       }
+
+
+      MX_USB_DEVICE_DeInit();
+
+      delay_ms(200);
 
 	  // Reset the board
 	  NVIC_SystemReset();

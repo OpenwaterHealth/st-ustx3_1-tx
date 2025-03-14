@@ -3,14 +3,14 @@
 
 // Internal storage for module information.
 static ModuleInfo modules[MAX_MODULES];
-static uint8_t totalModules = 0;
+static uint8_t totalModules = 1;
 static bool _configured = false;
 static uint8_t slave_address = 0;
 static uint8_t module_ID = 0;
 static DEVICE_ROLE my_device_role = ROLE_UNDEFINED;
 
 static void ModuleManager_clear_storage() {
-    totalModules = 0;
+    totalModules = 1;
     module_ID = 0;
     slave_address = 0;
     // Clear all module entries.
@@ -75,6 +75,14 @@ ModuleInfo* ModuleManager_GetModule(uint8_t moduleIndex) {
     return &modules[moduleIndex];
 }
 
+ModuleInfo* ModuleManager_GetModule_byTxID(uint8_t tx_id) {
+    if (tx_id >= totalModules*TX_PER_MODULE) {
+        return NULL;
+    }
+    uint8_t module_idx = tx_id / 2;
+    return &modules[module_idx];
+}
+
 TX7332* ModuleManager_GetTransmitter(uint8_t globalTxIndex) {
     uint8_t moduleIndex = ModuleManager_GetModuleIndex(globalTxIndex);
     uint8_t localTxIndex = ModuleManager_GetLocalTxIndex(globalTxIndex);
@@ -128,3 +136,13 @@ void set_configured(bool configured) {
 		_configured = configured;
 	}
 }
+
+uint8_t get_tx_chip_count() {
+	return totalModules * 2;
+}
+
+uint8_t get_module_count()
+{
+	return totalModules;
+}
+

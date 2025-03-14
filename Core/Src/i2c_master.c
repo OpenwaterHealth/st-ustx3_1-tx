@@ -19,7 +19,7 @@ uint8_t selected_slave = 0xFF;
 uint8_t found_address_count = 0;
 uint8_t found_addresses[MAX_FOUND_ADDRESSES];
 
-void I2C_scan(void)
+void I2C_scan_local(void)
 {
     // Reset the global array and counter
     memset(found_addresses, 0, MAX_FOUND_ADDRESSES );
@@ -43,7 +43,30 @@ void I2C_scan(void)
 
 }
 
-uint8_t send_buffer_to_slave(uint8_t slave_addr, uint8_t* pBuffer, uint16_t buf_len)
+void I2C_scan_global(void)
+{
+    // Reset the global array and counter
+    memset(found_addresses, 0, MAX_FOUND_ADDRESSES );
+    found_address_count = 0;
+
+    for (uint8_t address = 0x0; address < 0x7f; address++) {
+        HAL_StatusTypeDef status;
+        status = HAL_I2C_IsDeviceReady(&GLOBAL_I2C_DEVICE, address << 1, 2, 200); // Address shift left by 1 for read/write bit
+        if (status == HAL_OK) {
+            found_addresses[found_address_count] = address;
+            found_address_count++;
+        	printf("%2x ", address);
+        }else{
+        	printf("-- ");
+        }
+        if (address > 0 && (address + 1) % 16 == 0) printf("\r\n");
+    }
+
+    printf("\r\n\r\n");
+    fflush(stdout);
+
+}
+uint8_t send_buffer_to_slave_local(uint8_t slave_addr, uint8_t* pBuffer, uint16_t buf_len)
 {
 	// Check if the I2C handle is valid
     if (HAL_I2C_GetState(&LOCAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
@@ -62,7 +85,26 @@ uint8_t send_buffer_to_slave(uint8_t slave_addr, uint8_t* pBuffer, uint16_t buf_
 	return 0;
 }
 
-uint8_t read_status_register_of_slave(uint8_t slave_addr, uint8_t* pBuffer, uint16_t max_len)
+uint8_t send_buffer_to_slave_global(uint8_t slave_addr, uint8_t* pBuffer, uint16_t buf_len)
+{
+	// Check if the I2C handle is valid
+    if (HAL_I2C_GetState(&GLOBAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
+    	printf("===> ERROR I2C Not in ready state\r\n");
+        return 1; // I2C is not in a ready state
+    }
+
+	// printf("===> Sending Packet %d Bytes\r\n", buf_len);
+    if(HAL_I2C_Master_Transmit(&GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), pBuffer, buf_len, 100)!= HAL_OK)
+	{
+        /* Error_Handler() function is called when error occurs. */
+        return 2; // timeout
+	}
+
+
+	return 0;
+}
+
+uint8_t read_status_register_of_slave_local(uint8_t slave_addr, uint8_t* pBuffer, uint16_t max_len)
 {
 	uint8_t rx_len = sizeof(I2C_STATUS_Packet);
 	// Check if the I2C handle is valid
@@ -93,7 +135,41 @@ uint8_t read_status_register_of_slave(uint8_t slave_addr, uint8_t* pBuffer, uint
 
 	return rx_len;
 }
-uint8_t read_data_register_of_slave(uint8_t slave_addr, uint8_t* pBuffer, size_t rx_len)
+
+
+uint8_t read_status_register_of_slave_global(uint8_t slave_addr, uint8_t* pBuffer, uint16_t max_len)
+{
+	uint8_t rx_len = sizeof(I2C_STATUS_Packet);
+	// Check if the I2C handle is valid
+    if (HAL_I2C_GetState(&GLOBAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
+    	printf("===> ERROR I2C Not in ready state\r\n");
+        return 1; // I2C is not in a ready state
+    }
+
+	// printf("===> Receive Status Packet %d Bytes\r\n", rx_len);
+
+#if 0
+
+	if(HAL_I2C_Master_Receive(&GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
+	{
+        /* Error_Handler() function is called when error occurs. */
+        Error_Handler();
+	}
+
+#else
+
+    if(HAL_I2C_Mem_Read(&GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), 0x00, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
+    {
+        /* Error_Handler() function is called when error occurs. */
+        Error_Handler();
+    }
+
+#endif
+
+	return rx_len;
+}
+
+uint8_t read_data_register_of_slave_local(uint8_t slave_addr, uint8_t* pBuffer, size_t rx_len)
 {
 	// Check if the I2C handle is valid
     if (HAL_I2C_GetState(&LOCAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
@@ -104,6 +180,25 @@ uint8_t read_data_register_of_slave(uint8_t slave_addr, uint8_t* pBuffer, size_t
 	// printf("===> Receive Data Packet %d Bytes\r\n", rx_len);
 
     if(HAL_I2C_Mem_Read(&LOCAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), 0x01, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
+    {
+        /* Error_Handler() function is called when error occurs. */
+        Error_Handler();
+    }
+
+	return rx_len;
+}
+
+uint8_t read_data_register_of_slave_global(uint8_t slave_addr, uint8_t* pBuffer, size_t rx_len)
+{
+	// Check if the I2C handle is valid
+    if (HAL_I2C_GetState(&GLOBAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
+    	printf("===> ERROR I2C Not in ready state\r\n");
+        return 1; // I2C is not in a ready state
+    }
+
+	// printf("===> Receive Data Packet %d Bytes\r\n", rx_len);
+
+    if(HAL_I2C_Mem_Read(&GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), 0x01, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
     {
         /* Error_Handler() function is called when error occurs. */
         Error_Handler();

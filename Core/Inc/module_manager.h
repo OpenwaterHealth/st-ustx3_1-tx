@@ -85,6 +85,7 @@ ModuleInfo* ModuleManager_GetModule(uint8_t moduleIndex);
  */
 TX7332* ModuleManager_GetTransmitter(uint8_t globalTxIndex);
 
+ModuleInfo* ModuleManager_GetModule_byTxID(uint8_t tx_id);
 
 void set_module_ID(uint8_t id);
 uint8_t get_module_ID();
@@ -97,6 +98,10 @@ void set_slave_address(uint8_t address);
 
 bool get_configured();
 void set_configured(bool configured);
+
+uint8_t get_tx_chip_count();
+uint8_t get_module_count();
+
 
 #ifdef __cplusplus
 }
