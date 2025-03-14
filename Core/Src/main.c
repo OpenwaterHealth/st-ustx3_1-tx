@@ -85,7 +85,7 @@ DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
 
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 6};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 7};
 uint32_t id_words[3] = {0};
 
 
@@ -319,7 +319,6 @@ int main(void)
   MX_TIM15_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
-  MX_USB_DEVICE_Init();
   MX_CRC_Init();
   MX_RTC_Init();
   MX_TIM14_Init();
@@ -381,6 +380,9 @@ int main(void)
   // system entering ready state
   HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
 
+
+  HAL_Delay(250);
+  MX_USB_DEVICE_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -423,6 +425,7 @@ int main(void)
 		  set_configured(true);
 		  HAL_Delay(100);
 		  I2C_scan_global();
+
 		  comms_host_start();
 	  }else{
 		  while(!get_configured() && !_usb_interrupt_flag)
@@ -1218,6 +1221,15 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
 	}
 }
 
+void delay_ms(uint32_t ms)
+{
+	printf("Clock: %ld\r\n", SystemCoreClock);
+    uint32_t delay_cycles = (SystemCoreClock / 1000) * ms;
+    while (delay_cycles--) {
+        __NOP();  // Ensures the loop doesn't get optimized away
+    }
+}
+
 /* USER CODE END 4 */
 
 /**
@@ -1252,6 +1264,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		// 16k SRAM in address 0x2000 0000 - 0x2000 3FFF
 		*((unsigned long *)0x20003FF0) = 0xDEADBEEF;
       }
+
+
+      MX_USB_DEVICE_DeInit();
+
+      delay_ms(200);
 
 	  // Reset the board
 	  NVIC_SystemReset();
