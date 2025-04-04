@@ -85,7 +85,7 @@ DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
 
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 7};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 8};
 uint32_t id_words[3] = {0};
 
 
@@ -230,6 +230,20 @@ void ConfigureResetPin(bool master)
         SetSlaveReadyState(false);
     }
 
+}
+
+void ConfigureHIzPin(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+	// De-initialize the REF_SEL pin
+	HAL_GPIO_DeInit(GPIOx, GPIO_Pin);
+
+
+    // Configure as input with no pull-up/down (Hi-Z)
+    GPIO_InitStruct.Pin = GPIO_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
 }
 
 static bool ConfigureClock()
@@ -414,6 +428,7 @@ int main(void)
 		  ConfigureClock();
 
 	  }else{
+		  ConfigureHIzPin(TRIGGER_GPIO_Port, TRIGGER_Pin);
 		  ConfigureResetPin(false);
 		  configure_slave();
 		  SetSlaveReadyState(true);
