@@ -166,8 +166,8 @@ extern UART_HandleTypeDef huart3;
 #define TRIGGER_TIMER htim15
 #define RESET_TIMER htim17
 
-#define GLOBAL_I2C_DEVICE hi2c2
-#define LOCAL_I2C_DEVICE hi2c1
+#define GLOBAL_I2C_DEVICE hi2c1
+#define LOCAL_I2C_DEVICE hi2c2
 
 #define MAX31875_ADDRESS 0x48
 
