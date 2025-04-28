@@ -149,8 +149,6 @@ void set_reconfigure();
 extern uint8_t found_addresses[]; // Global array to store found addresses
 extern uint8_t found_address_count; // Counter for found addresses
 
-extern I2C_HandleTypeDef hi2c1;
-extern I2C_HandleTypeDef hi2c2;
 extern CRC_HandleTypeDef hcrc;
 extern SPI_HandleTypeDef hspi1;
 extern TIM_HandleTypeDef htim14;
@@ -166,8 +164,9 @@ extern UART_HandleTypeDef huart3;
 #define TRIGGER_TIMER htim15
 #define RESET_TIMER htim17
 
-#define GLOBAL_I2C_DEVICE hi2c1
-#define LOCAL_I2C_DEVICE hi2c2
+extern I2C_HandleTypeDef* GLOBAL_I2C_DEVICE;
+extern I2C_HandleTypeDef* LOCAL_I2C_DEVICE;
+
 
 #define MAX31875_ADDRESS 0x48
 
