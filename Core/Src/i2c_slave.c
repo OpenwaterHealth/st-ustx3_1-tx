@@ -47,14 +47,14 @@ __IO int countError = 0;
 void I2C_Slave_Init(uint8_t addr) {
 
   if(addr == 0x00 || addr > 0x7F){
-	  GLOBAL_I2C_DEVICE.Init.OwnAddress1  = 0x32 << 1;  // default to 32
+	  GLOBAL_I2C_DEVICE->Init.OwnAddress1  = 0x32 << 1;  // default to 32
   }else{
-	  GLOBAL_I2C_DEVICE.Init.OwnAddress1  = addr << 1;
+	  GLOBAL_I2C_DEVICE->Init.OwnAddress1  = addr << 1;
   }
 
   data_available = NULL;
   // Reinitialize the I2C peripheral with the updated configuration
-  if (HAL_I2C_Init(&GLOBAL_I2C_DEVICE) != HAL_OK) {
+  if (HAL_I2C_Init(GLOBAL_I2C_DEVICE) != HAL_OK) {
 	  // Handle the error if reinitialization fails
 	  printf("Error Handler");
 	  Error_Handler();
@@ -71,7 +71,7 @@ void I2C_Slave_Init(uint8_t addr) {
   _status_packet.reserved = 0;
   _status_packet.data_len = 0;
 
-  if(HAL_I2C_EnableListen_IT(&GLOBAL_I2C_DEVICE) != HAL_OK) {
+  if(HAL_I2C_EnableListen_IT(GLOBAL_I2C_DEVICE) != HAL_OK) {
 	  // Handle the error if reinitialization fails
 	  printf("Error Handler");
 	  Error_Handler();
@@ -87,7 +87,7 @@ void i2c_print_info() {
     //uint32_t i2c_speed = pclk / ((timing & 0xFFFF) + 1);
 
     printf("I2C Speed: %d kHz\r\n", 400); // Print the I2C speed in kHz
-    printf("I2C Slave Addr: 0x%02x\r\n\r\n", (uint8_t)(GLOBAL_I2C_DEVICE.Init.OwnAddress1 >> 1));
+    printf("I2C Slave Addr: 0x%02x\r\n\r\n", (uint8_t)(GLOBAL_I2C_DEVICE->Init.OwnAddress1 >> 1));
 }
 
 
@@ -235,7 +235,7 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
 
 void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *I2cHandle)
 {
-	if(I2cHandle->Instance == GLOBAL_I2C_DEVICE.Instance) {
+	if(I2cHandle->Instance == GLOBAL_I2C_DEVICE->Instance) {
 		if(is_first_byte_received == 1)
 		{
 			is_first_byte_received = 0;
@@ -264,7 +264,7 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *I2cHandle)
 void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *I2cHandle)
 {
 	/* Reset address match code event */
-	if(I2cHandle->Instance == GLOBAL_I2C_DEVICE.Instance) {
+	if(I2cHandle->Instance == GLOBAL_I2C_DEVICE->Instance) {
 		if(is_first_byte_received == 0)
 		{
 			rx_count++;

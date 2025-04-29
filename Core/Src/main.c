@@ -85,9 +85,12 @@ DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
 
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 8};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 9};
 uint32_t id_words[3] = {0};
 
+// Define the pointers
+I2C_HandleTypeDef* GLOBAL_I2C_DEVICE = NULL;
+I2C_HandleTypeDef* LOCAL_I2C_DEVICE = NULL;
 
 volatile bool _enter_dfu = false;
 volatile bool _usb_interrupt_flag = false;
@@ -289,6 +292,29 @@ static bool ConfigureClock()
 }
 
 
+static void Detect_MAX31875_Bus(void)
+{
+    uint8_t dummy = 0;
+
+    // Try hi2c1 first
+    if (HAL_I2C_Master_Transmit(&hi2c1, MAX31875_ADDRESS << 1, &dummy, 0, 100) == HAL_OK ||
+        HAL_I2C_IsDeviceReady(&hi2c1, MAX31875_ADDRESS << 1, 1, 100) == HAL_OK)
+    {
+        LOCAL_I2C_DEVICE = &hi2c1;
+        GLOBAL_I2C_DEVICE = &hi2c2;
+    }
+    else if (HAL_I2C_Master_Transmit(&hi2c2, MAX31875_ADDRESS << 1, &dummy, 0, 100) == HAL_OK ||
+             HAL_I2C_IsDeviceReady(&hi2c2, MAX31875_ADDRESS << 1, 1, 100) == HAL_OK)
+    {
+        LOCAL_I2C_DEVICE = &hi2c2;
+        GLOBAL_I2C_DEVICE = &hi2c1;
+    }
+    else
+    {
+        // Could not detect MAX31875 on either bus
+        Error_Handler();
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -356,6 +382,7 @@ int main(void)
   Thermistor_Start(&hadc, 2.5f, 10000.0f);
 
   //I2C_scan();
+  Detect_MAX31875_Bus();
   HAL_Delay(5);
 
   // Initializing TX7332
