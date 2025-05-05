@@ -23,7 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "i2c_master.h"
-#include "config_CDCE6214_64MHZ.h"
+#include "config_CDCE6214_10MHZ.h"
 
 #include "tx7332.h"
 #include "usbd_cdc_if.h"
@@ -85,7 +85,7 @@ DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
 
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 9};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 10};
 uint32_t id_words[3] = {0};
 
 // Define the pointers
@@ -261,12 +261,12 @@ static bool ConfigureClock()
   // printf("Configuring Clock chip\r\n");
   // Calculate the number of elements in the array
   // blur6214_64mhz_values
-  size_t num_elements = sizeof(cdce6214_v4_64mhz_values) / sizeof(uint32_t);
+  size_t num_elements = sizeof(cdce6214_v4_10mhz_values) / sizeof(uint32_t);
 
   // Iterate through the array and split each uint32_t value into two uint16_t values
   for (size_t i = 0; i < num_elements; i++)
   {
-    uint32_t value = cdce6214_v4_64mhz_values[i];
+    uint32_t value = cdce6214_v4_10mhz_values[i];
 
     // Split the value into upper and lower words
     uint16_t reg_addr = (uint16_t)(value >> 16); // Upper word is reg_addr
