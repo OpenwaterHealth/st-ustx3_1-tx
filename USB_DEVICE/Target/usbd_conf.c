@@ -43,8 +43,9 @@
 
 PCD_HandleTypeDef hpcd_USB_FS;
 void Error_Handler(void);
-extern volatile bool _usb_interrupt_flag;
+
 /* USER CODE BEGIN 0 */
+extern volatile bool _usb_interrupt_flag;
 
 /* USER CODE END 0 */
 
