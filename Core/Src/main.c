@@ -72,6 +72,8 @@ RTC_HandleTypeDef hrtc;
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim7;
 TIM_HandleTypeDef htim14;
 TIM_HandleTypeDef htim15;
 TIM_HandleTypeDef htim17;
@@ -85,7 +87,7 @@ DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
 
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 10};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 11};
 uint32_t id_words[3] = {0};
 
 // Define the pointers
@@ -114,6 +116,8 @@ static void MX_CRC_Init(void);
 static void MX_RTC_Init(void);
 static void MX_TIM14_Init(void);
 static void MX_TIM17_Init(void);
+static void MX_TIM7_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 OW_TimerData _timerDataConfig;
@@ -359,19 +363,27 @@ int main(void)
   MX_TIM15_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
+  MX_USB_DEVICE_Init();
   MX_CRC_Init();
   MX_RTC_Init();
   MX_TIM14_Init();
   MX_TIM17_Init();
+  MX_TIM7_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   SetPinsHighImpedance();
 
   // setup default
+  OW_TIM2_DeInit();
   OW_TIM15_DeInit();
   _timerDataConfig.TriggerFrequencyHz = 10;
-  _timerDataConfig.TriggerPulseCount = 0; // no pulse count
   _timerDataConfig.TriggerPulseWidthUsec = 15000;
-  _timerDataConfig.TriggerMode = 0; // continuous
+  _timerDataConfig.TriggerPulseCount = 0; // no pulse count
+  _timerDataConfig.TriggerPulseTrainCount = 0;
+  _timerDataConfig.TriggerPulseTrainInterval = 0;
+  _timerDataConfig.TriggerMode = 1; // continuous
+  _timerDataConfig.ProfileIncrement = 0;
+  _timerDataConfig.ProfileIndex = 0;
 
   HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_SET);
@@ -441,9 +453,9 @@ int main(void)
 		  ConfigureResetPin(true);
 		  configure_master();
 		  // configure PWM for trigger pulse
-		  init_trigger_pulse(&htim15, TIM_CHANNEL_2);
+		  init_trigger_pulse(&htim15, TIM_CHANNEL_2, &htim2);
 		  HAL_Delay(1);
-		  deinit_trigger_pulse(&htim15, TIM_CHANNEL_2);
+		  deinit_trigger_pulse(&htim15, TIM_CHANNEL_2, &htim2);
 		  MX_TIM1_Init();
 		  // 2MHz reference signal
 		  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
@@ -891,6 +903,93 @@ static void MX_TIM1_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 4294967295;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief TIM7 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM7_Init(void)
+{
+
+  /* USER CODE BEGIN TIM7_Init 0 */
+
+  /* USER CODE END TIM7_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 48-1;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 65535;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_OnePulse_Init(&htim7, TIM_OPMODE_SINGLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
+
+  /* USER CODE END TIM7_Init 2 */
+
+}
+
+/**
   * @brief TIM14 Initialization Function
   * @param None
   * @retval None
@@ -1288,6 +1387,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
   if (htim->Instance == CDC_TIMER.Instance) {
 	  CDC_Idle_Timer_Handler();
+  }
+
+  if (htim->Instance == TRIGGER_TIMER.Instance) {
+	  TRIG_TIM_PeriodElapsedCallback(htim);
+  }
+
+  if (htim->Instance == TRIGGER_TIMER2.Instance) {
+	  TRIG2_TIM_PeriodElapsedCallback(htim);
   }
 
   /* USER CODE END Callback 0 */

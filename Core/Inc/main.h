@@ -153,6 +153,7 @@ extern CRC_HandleTypeDef hcrc;
 extern SPI_HandleTypeDef hspi1;
 extern TIM_HandleTypeDef htim14;
 extern TIM_HandleTypeDef htim15;
+extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim17;
 
 extern UART_HandleTypeDef huart2;
@@ -162,6 +163,7 @@ extern UART_HandleTypeDef huart3;
 #define CALL_IN_UART huart2
 #define CDC_TIMER htim14
 #define TRIGGER_TIMER htim15
+#define TRIGGER_TIMER2 htim2
 #define RESET_TIMER htim17
 
 extern I2C_HandleTypeDef* GLOBAL_I2C_DEVICE;
