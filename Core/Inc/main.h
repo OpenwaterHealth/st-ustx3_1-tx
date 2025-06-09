@@ -72,15 +72,15 @@ void set_reconfigure();
 #define TX1_CS_GPIO_Port GPIOA
 #define TR4_EN_Pin GPIO_PIN_15
 #define TR4_EN_GPIO_Port GPIOC
-#define LOCAL_SCL_Pin GPIO_PIN_10
-#define LOCAL_SCL_GPIO_Port GPIOB
+#define TR3_EN_Pin GPIO_PIN_8
+#define TR3_EN_GPIO_Port GPIOB
 #define SYSTEM_RDY_Pin GPIO_PIN_2
 #define SYSTEM_RDY_GPIO_Port GPIOD
 #define TX1_SHUTZ_Pin GPIO_PIN_11
 #define TX1_SHUTZ_GPIO_Port GPIOC
 #define CALL_OUT_Pin GPIO_PIN_10
 #define CALL_OUT_GPIO_Port GPIOC
-#define LOCAL_SDA_Pin GPIO_PIN_11
+#define LOCAL_SDA_Pin GPIO_PIN_7
 #define LOCAL_SDA_GPIO_Port GPIOB
 #define HW_SW_CTRL_Pin GPIO_PIN_5
 #define HW_SW_CTRL_GPIO_Port GPIOB
@@ -90,8 +90,8 @@ void set_reconfigure();
 #define INT_GPIO_Port GPIOA
 #define RST_Pin GPIO_PIN_9
 #define RST_GPIO_Port GPIOA
-#define TR3_EN_Pin GPIO_PIN_8
-#define TR3_EN_GPIO_Port GPIOB
+#define LOCAL_SCL_Pin GPIO_PIN_6
+#define LOCAL_SCL_GPIO_Port GPIOB
 #define RX_I2C_SDA_Pin GPIO_PIN_9
 #define RX_I2C_SDA_GPIO_Port GPIOC
 #define GPIO3_Pin GPIO_PIN_1
@@ -126,7 +126,7 @@ void set_reconfigure();
 #define TR2_EN_GPIO_Port GPIOB
 #define TR7_EN_Pin GPIO_PIN_2
 #define TR7_EN_GPIO_Port GPIOB
-#define GLOBAL_SCL_Pin GPIO_PIN_6
+#define GLOBAL_SCL_Pin GPIO_PIN_10
 #define GLOBAL_SCL_GPIO_Port GPIOB
 #define TR6_EN_Pin GPIO_PIN_13
 #define TR6_EN_GPIO_Port GPIOB
@@ -138,10 +138,10 @@ void set_reconfigure();
 #define TR5_EN_GPIO_Port GPIOC
 #define RDY_Pin GPIO_PIN_5
 #define RDY_GPIO_Port GPIOC
-#define GLOBAL_SDA_Pin GPIO_PIN_7
+#define GLOBAL_SDA_Pin GPIO_PIN_11
 #define GLOBAL_SDA_GPIO_Port GPIOB
-#define ESTOP_Pin GPIO_PIN_12
-#define ESTOP_GPIO_Port GPIOB
+#define EXT_Pin GPIO_PIN_12
+#define EXT_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 #define MAX_FOUND_ADDRESSES 10 // Maximum number of found addresses

@@ -215,10 +215,10 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* hi2c)
 
     __HAL_RCC_GPIOB_CLK_ENABLE();
     /**I2C1 GPIO Configuration
-    PB8     ------> I2C1_SCL
     PB7     ------> I2C1_SDA
+    PB6     ------> I2C1_SCL
     */
-    GPIO_InitStruct.Pin = LOCAL_SCL_Pin|LOCAL_SDA_Pin;
+    GPIO_InitStruct.Pin = LOCAL_SDA_Pin|LOCAL_SCL_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
@@ -281,12 +281,12 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
     __HAL_RCC_I2C1_CLK_DISABLE();
 
     /**I2C1 GPIO Configuration
-    PB8     ------> I2C1_SCL
     PB7     ------> I2C1_SDA
+    PB6     ------> I2C1_SCL
     */
-    HAL_GPIO_DeInit(LOCAL_SCL_GPIO_Port, LOCAL_SCL_Pin);
-
     HAL_GPIO_DeInit(LOCAL_SDA_GPIO_Port, LOCAL_SDA_Pin);
+
+    HAL_GPIO_DeInit(LOCAL_SCL_GPIO_Port, LOCAL_SCL_Pin);
 
     /* I2C1 interrupt DeInit */
     HAL_NVIC_DisableIRQ(I2C1_IRQn);
