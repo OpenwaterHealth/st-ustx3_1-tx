@@ -72,6 +72,8 @@ RTC_HandleTypeDef hrtc;
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim14;
 TIM_HandleTypeDef htim15;
 TIM_HandleTypeDef htim17;
@@ -85,7 +87,7 @@ DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
 
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 11};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 12};
 uint32_t id_words[3] = {0};
 
 // Define the pointers
@@ -114,10 +116,9 @@ static void MX_CRC_Init(void);
 static void MX_RTC_Init(void);
 static void MX_TIM14_Init(void);
 static void MX_TIM17_Init(void);
+static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
-
-OW_TimerData _timerDataConfig;
-OW_TriggerConfig _triggerConfig;
 
 /* USER CODE END PFP */
 
@@ -363,15 +364,13 @@ int main(void)
   MX_RTC_Init();
   MX_TIM14_Init();
   MX_TIM17_Init();
+  MX_TIM2_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   SetPinsHighImpedance();
 
   // setup default
-  OW_TIM15_DeInit();
-  _timerDataConfig.TriggerFrequencyHz = 10;
-  _timerDataConfig.TriggerPulseCount = 0; // no pulse count
-  _timerDataConfig.TriggerPulseWidthUsec = 15000;
-  _timerDataConfig.TriggerMode = 0; // continuous
+  deinit_trigger();
 
   HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TRANSMIT_LED_GPIO_Port, TRANSMIT_LED_Pin, GPIO_PIN_SET);
@@ -438,12 +437,21 @@ int main(void)
 	if(!get_configured()) {
 	  // start listen
 	  if(get_device_role()==ROLE_MASTER){
+		  OW_TimerData timerDataConfig;
+
 		  ConfigureResetPin(true);
 		  configure_master();
-		  // configure PWM for trigger pulse
-		  init_trigger_pulse(&htim15, TIM_CHANNEL_2);
-		  HAL_Delay(1);
-		  deinit_trigger_pulse(&htim15, TIM_CHANNEL_2);
+
+		  timerDataConfig.TriggerFrequencyHz = 10;
+		  timerDataConfig.TriggerPulseWidthUsec = 2000;
+		  timerDataConfig.TriggerPulseCount = 5; // no pulse count
+		  timerDataConfig.TriggerPulseTrainCount = 2;
+		  timerDataConfig.TriggerPulseTrainInterval = 0;
+		  timerDataConfig.TriggerMode = TRIGGER_MODE_CONTINUOUS; // TRIGGER_MODE_SEQUENCE TRIGGER_MODE_CONTINUOUS TRIGGER_MODE_SINGLE
+		  timerDataConfig.ProfileIncrement = 0;
+		  timerDataConfig.ProfileIndex = 0;
+		  init_trigger_pulse(timerDataConfig);
+
 		  MX_TIM1_Init();
 		  // 2MHz reference signal
 		  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
@@ -891,6 +899,96 @@ static void MX_TIM1_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 48-1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 1000-1;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 48-1;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 1000-1;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_ENABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
   * @brief TIM14 Initialization Function
   * @param None
   * @retval None
@@ -934,6 +1032,7 @@ static void MX_TIM15_Init(void)
   /* USER CODE END TIM15_Init 0 */
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_OC_InitTypeDef sConfigOC = {0};
   TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
@@ -942,12 +1041,12 @@ static void MX_TIM15_Init(void)
 
   /* USER CODE END TIM15_Init 1 */
   htim15.Instance = TIM15;
-  htim15.Init.Prescaler = 4800-1;
+  htim15.Init.Prescaler = 48-1;
   htim15.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim15.Init.Period = 10000-1;
+  htim15.Init.Period = 1000-1;
   htim15.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim15.Init.RepetitionCounter = 0;
-  htim15.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  htim15.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim15) != HAL_OK)
   {
     Error_Handler();
@@ -961,6 +1060,16 @@ static void MX_TIM15_Init(void)
   {
     Error_Handler();
   }
+  if (HAL_TIM_OnePulse_Init(&htim15, TIM_OPMODE_SINGLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_TRIGGER;
+  sSlaveConfig.InputTrigger = TIM_TS_ITR1;
+  if (HAL_TIM_SlaveConfigSynchro(&htim15, &sSlaveConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim15, &sMasterConfig) != HAL_OK)
@@ -968,8 +1077,8 @@ static void MX_TIM15_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 5000-1;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.Pulse = 1000;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
@@ -1270,6 +1379,19 @@ void delay_ms(uint32_t ms)
     }
 }
 
+// In your main.c or elsewhere:
+void pulsetrain_complete_callback(uint32_t train_count) {
+    // Called after pulse trains are done
+}
+
+void sequence_complete_callback(void) {
+    // Called after sequence is completed
+}
+
+void pulse_complete_callback(uint32_t pulse_count) {
+    // Called after pulse is complete
+}
+
 /* USER CODE END 4 */
 
 /**
@@ -1286,6 +1408,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
   if (htim->Instance == CDC_TIMER.Instance) {
 	  CDC_Idle_Timer_Handler();
+  }
+
+  if (htim->Instance == TIM3)
+  {
+    TRIG_TIM3_IRQHandler();
+  }
+
+  if (htim->Instance == TIM2)
+  {
+    TRIG_TIM2_IRQHandler();
   }
 
   /* USER CODE END Callback 0 */

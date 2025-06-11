@@ -283,7 +283,7 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->addr = cmd->addr;
 			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = 0;
-			if(!start_trigger_pulse())
+			if(start_trigger_pulse() != TRIGGER_STATUS_RUNNING)
 			{
 				uartResp->packet_type = OW_ERROR;
 			}
@@ -293,7 +293,7 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->addr = cmd->addr;
 			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = 0;
-			if(!stop_trigger_pulse())
+			if(stop_trigger_pulse() != TRIGGER_STATUS_READY)
 			{
 				uartResp->packet_type = OW_ERROR;
 			}
