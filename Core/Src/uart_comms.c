@@ -722,3 +722,16 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
 
     }
 }
+
+// In your main.c or elsewhere:
+void pulsetrain_complete_callback(uint32_t train_count) {
+    // Called after pulse trains are done
+}
+
+void sequence_complete_callback(void) {
+    // Called after sequence is completed
+}
+
+void pulse_complete_callback(uint32_t pulse_count) {
+    // Called after pulse is complete
+}
