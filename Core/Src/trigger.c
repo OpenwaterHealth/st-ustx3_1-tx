@@ -131,21 +131,31 @@ static int jsonToTimerData(const char *jsonString)
 
 static void Configure_TIMERS_Frequency(TIM_HandleTypeDef* htim, uint32_t frequencyHz, bool is32BIT)
 {
+    uint32_t timer_clk = 48000000;  // 48 MHz source clock
     uint32_t prescaler = 0;
     uint32_t arr = 0;
 
-    // Target: TIM3 Update Event at desiredFrequency Hz
-    // Formula: desiredFrequency = timerClock / ((Prescaler + 1) * (ARR + 1))
-    // Strategy: Fix Prescaler = 47 -> Timer runs at 1 MHz, so ARR = (1M / desiredFrequency) - 1
-    prescaler = 47;
-    arr = (1000000 / frequencyHz) - 1;
+    // Try to find prescaler and arr such that arr <= 0xFFFF
+    for (prescaler = 0; prescaler <= 0xFFFF; prescaler++) {
+        uint32_t temp_arr = (timer_clk / (frequencyHz * (prescaler + 1))) - 1;
 
-    // Safety check
-    if(is32BIT)
-    {
-    	if (arr > 0xFFFF) arr = 0xFFFF;
-    }else{
-    	if (arr > 0xFFFFFFFF) arr = 0xFFFFFFFF;
+        if (is32BIT) {
+            if (temp_arr <= 0xFFFFFFFF) {
+                arr = temp_arr;
+                break;
+            }
+        } else {
+            if (temp_arr <= 0xFFFF) {
+                arr = temp_arr;
+                break;
+            }
+        }
+    }
+
+    // If we reach max prescaler without a valid arr, fallback
+    if (prescaler > 0xFFFF) {
+        prescaler = 0xFFFF;
+        arr = 0xFFFF;
     }
 
     // Reset and prepare TIM15
@@ -157,7 +167,6 @@ static void Configure_TIMERS_Frequency(TIM_HandleTypeDef* htim, uint32_t frequen
 
     // Clear interrupt flags
     __HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_UPDATE);
-    __HAL_TIM_ENABLE_IT(htim, TIM_IT_UPDATE);
 }
 
 
@@ -233,7 +242,7 @@ static void Configure_ONESHOT_Timer(TIM_HandleTypeDef* htim, uint16_t pulsewidth
 
 	  /* USER CODE END TIM15_Init 2 */
 	  HAL_TIM_MspPostInit(htim);
-	  __HAL_TIM_SET_COUNTER(htim, 0);  // Reset counter
+
 }
 
 void print_OW_TimerData(const OW_TimerData *data) {
@@ -345,7 +354,6 @@ void init_trigger_pulse(OW_TimerData new_timerDataConfig) {
     _timerDataConfig.TriggerState = TRIGGER_STATE_READY;
     _timerDataConfig.TriggerStatus = TRIGGER_STATUS_READY;
 
-    print_OW_TimerData((const OW_TimerData *)&_timerDataConfig);
 }
 
 
@@ -387,7 +395,15 @@ uint8_t start_trigger_pulse(void) {
 
     // Clear interrupt flags
     __HAL_TIM_CLEAR_FLAG(&HIRES_TIMER, TIM_FLAG_UPDATE);
+    __HAL_TIM_CLEAR_FLAG(&LORES_TIMER, TIM_FLAG_UPDATE);
+
+    __HAL_TIM_SET_COUNTER(&TRIGGER_TIMER, 0);  // Just in case
+    __HAL_TIM_SET_COUNTER(&LORES_TIMER, 0);
+    __HAL_TIM_SET_COUNTER(&HIRES_TIMER, 0);
+
+    __HAL_TIM_ENABLE_IT(&LORES_TIMER, TIM_IT_UPDATE);
     __HAL_TIM_ENABLE_IT(&HIRES_TIMER, TIM_IT_UPDATE);
+
 
     // Start PWM
     HAL_TIM_PWM_Start(&TRIGGER_TIMER, TIM_CHANNEL_2);
@@ -416,7 +432,11 @@ void TRIG_TIM2_IRQHandler(void) {
 
 	_trainCount++;
     pulsetrain_complete_callback(_trainCount);
-	if((_trainCount>=_timerDataConfig.TriggerPulseTrainCount || _timerDataConfig.TriggerMode == TRIGGER_MODE_SINGLE) &&  _timerDataConfig.TriggerMode != TRIGGER_MODE_CONTINUOUS) {
+    if(_timerDataConfig.TriggerMode == TRIGGER_MODE_SINGLE) {
+        stop_trigger_pulse();
+        sequence_complete_callback();
+        return;
+    }else if(_trainCount>=_timerDataConfig.TriggerPulseTrainCount &&  _timerDataConfig.TriggerMode != TRIGGER_MODE_CONTINUOUS) {
         stop_trigger_pulse();
         sequence_complete_callback();
 	}else{
