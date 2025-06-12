@@ -34,6 +34,8 @@ volatile uint16_t ow_packetid = 0;
 static uint16_t ow_packet_count;
 static UartPacket ow_send_packet;
 static UartPacket ow_receive_packet;
+static UartPacket ow_data_packet;
+static uint8_t owDataBuffer[256] = {0};
 
 static uint16_t get_ow_next_packetID(){
 	ow_packet_count++;
@@ -126,7 +128,7 @@ static void comms_interface_send(UartPacket* pResp)
     txBuffer[bufferIndex++] = OW_START_BYTE;
     txBuffer[bufferIndex++] = pResp->id >> 8;
     txBuffer[bufferIndex++] = pResp->id & 0xFF;
-    txBuffer[bufferIndex++] = OW_RESP;
+    txBuffer[bufferIndex++] = pResp->packet_type;
     txBuffer[bufferIndex++] = pResp->command;
     txBuffer[bufferIndex++] = pResp->addr;
     txBuffer[bufferIndex++] = pResp->reserved;
@@ -726,10 +728,24 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
 // In your main.c or elsewhere:
 void pulsetrain_complete_callback(uint32_t train_count) {
     // Called after pulse trains are done
+	ow_data_packet.packet_type = OW_DATA;
+	ow_data_packet.id = 0;
+	ow_data_packet.addr = 0;
+	ow_data_packet.reserved = 0;
+	ow_data_packet.data_len = 0;
+	ow_data_packet.data = owDataBuffer;
+
 }
 
 void sequence_complete_callback(void) {
     // Called after sequence is completed
+	ow_data_packet.packet_type = OW_DATA;
+	ow_data_packet.id = 0;
+	ow_data_packet.addr = 0;
+	ow_data_packet.reserved = 0;
+	ow_data_packet.data_len = 0;
+	ow_data_packet.data = owDataBuffer;
+
 }
 
 void pulse_complete_callback(uint32_t pulse_count) {

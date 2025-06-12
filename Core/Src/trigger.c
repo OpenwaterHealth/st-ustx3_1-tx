@@ -62,6 +62,7 @@ static void timerDataToJson(char *jsonString, size_t max_length)
 			  "\"TriggerMode\": %lu,"
 			  "\"ProfileIndex\": %lu,"
 			  "\"ProfileIncrement\": %lu,"
+			  "\"TrainCount\": %lu,"
 			  "\"TriggerStatus\": \"%s\""
 			  "}",
 			  _timerDataConfig.TriggerFrequencyHz,
@@ -72,6 +73,7 @@ static void timerDataToJson(char *jsonString, size_t max_length)
 			  _timerDataConfig.TriggerMode,
 			  _timerDataConfig.ProfileIndex,
 			  _timerDataConfig.ProfileIncrement,
+			  _trainCount,
 			  _timerDataConfig.TriggerStatus == TRIGGER_STATUS_RUNNING ? "RUNNING" : "STOPPED");
 }
 

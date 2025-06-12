@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 
-#define COMMAND_MAX_SIZE 256
+#define COMMAND_MAX_SIZE 384
 #define ONEWIRE_MAX_SIZE 48
 
 // Configuration: each module has two transmitters; adjust as necessary.
