@@ -434,7 +434,6 @@ void TRIG_TIM2_IRQHandler(void) {
     HAL_TIM_PWM_Stop(&TRIGGER_TIMER, TIM_CHANNEL_2);
 
 	_trainCount++;
-    pulsetrain_complete_callback(_trainCount, _timerDataConfig.TriggerPulseTrainCount);
     if(_timerDataConfig.TriggerMode == TRIGGER_MODE_SINGLE) {
         stop_trigger_pulse();
         sequence_complete_callback(_timerDataConfig.TriggerPulseTrainCount );
@@ -443,6 +442,7 @@ void TRIG_TIM2_IRQHandler(void) {
         stop_trigger_pulse();
         sequence_complete_callback(_timerDataConfig.TriggerPulseTrainCount );
 	}else{
+	    pulsetrain_complete_callback(_trainCount, _timerDataConfig.TriggerPulseTrainCount);
 	    _pulseCount = 0;
 	    HAL_TIM_PWM_Start(&TRIGGER_TIMER, TIM_CHANNEL_2);
 	    __HAL_TIM_ENABLE_IT(&LORES_TIMER, TIM_IT_UPDATE);
@@ -474,7 +474,6 @@ void TRIG_TIM3_IRQHandler(void) {
 			_trainCount++;
         	if(_timerDataConfig.TriggerMode == TRIGGER_MODE_SINGLE)
         	{
-				pulsetrain_complete_callback(_trainCount, _timerDataConfig.TriggerPulseTrainCount);
 		        stop_trigger_pulse();
 		        sequence_complete_callback(_timerDataConfig.TriggerPulseTrainCount );
         		return;
