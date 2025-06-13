@@ -10,8 +10,10 @@
 #include "module_manager.h"
 #include "uart_comms.h"
 #include "utils.h"
-#include <string.h>
 #include "usbd_cdc_if.h"
+
+#include <string.h>
+#include <stdbool.h>
 
 #define ONEWIRE_TIMEOUT 1000
 #define TX_TIMEOUT 1000
@@ -30,6 +32,8 @@ volatile uint8_t tx_ow_callin_flag = 0;
 volatile uint8_t rx_ow_callout_flag = 0;
 volatile uint8_t tx_ow_callout_flag = 0;
 volatile uint16_t ow_packetid = 0;
+
+bool async_enabled = false;
 
 static uint16_t ow_packet_count;
 static UartPacket ow_send_packet;
