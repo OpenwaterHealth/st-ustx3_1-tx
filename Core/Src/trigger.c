@@ -25,23 +25,6 @@ static volatile OW_TimerData _timerDataConfig = {
 		.TriggerStatus = TRIGGER_STATUS_NOT_CONFIGURED
 };
 
-// Weak callback implementations
-__weak void pulsetrain_complete_callback(uint32_t curr_count, uint32_t total_count) {
-    // Default empty implementation - can be overridden by user
-    (void)curr_count;
-    (void)total_count;
-}
-
-__weak void sequence_complete_callback(uint32_t total_count) {
-    // Default empty implementation - can be overridden by user
-    (void)total_count;
-}
-
-__weak void pulse_complete_callback(uint32_t curr_count, uint32_t total_count) {
-    // Default empty implementation - can be overridden by user
-    (void)curr_count;
-    (void)total_count;
-}
 
 
 static int jsoneq(const char *json, jsmntok_t *tok, const char *s) {
@@ -305,6 +288,8 @@ bool set_trigger_data(char *jsonString, size_t str_len)
 	 if(_timerDataConfig.TriggerStatus == TRIGGER_STATUS_RUNNING){
 		 stop_trigger_pulse();
 	 }
+
+	 _timerDataConfig.TriggerStatus = TRIGGER_STATUS_READY;
 
 	 if (jsonToTimerData((const char *)tempArr) == 0)
 	 {

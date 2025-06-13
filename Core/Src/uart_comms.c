@@ -775,6 +775,7 @@ void pulsetrain_complete_callback(uint32_t curr_count, uint32_t total_count) {
 
 // STATUS:RUNNING,MODE:SEQUENCE,PULSE_TRAIN:[2/5],PULSE:[3/10],TEMP_TX:32.6,TEMP_AMBIENT:29.1
 void sequence_complete_callback(uint32_t total_count) {
+
 	if(async_enabled){
 
 		int tx_temp_int = (int)(last_temperature * 10);  // e.g. 32.6 → 326
