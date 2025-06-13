@@ -47,14 +47,16 @@ uint8_t start_trigger_pulse(void);
 uint8_t stop_trigger_pulse(void);
 bool get_trigger_data(char *jsonString, size_t max_length);
 bool set_trigger_data(char *jsonString, size_t str_len);
+uint8_t get_trigger_mode(void);
+const char* get_trigger_mode_str(void);
 
 void TRIG_TIM2_IRQHandler(void);
 void TRIG_TIM3_IRQHandler(void);
 void print_OW_TimerData(const OW_TimerData *data);
 
 // Weak callback functions
-__weak void pulse_complete_callback(uint32_t pulse_count);
-__weak void pulsetrain_complete_callback(uint32_t train_count);
-__weak void sequence_complete_callback(void);
+__weak void pulse_complete_callback(uint32_t curr_count, uint32_t total_count);
+__weak void pulsetrain_complete_callback(uint32_t curr_count, uint32_t total_count);
+__weak void sequence_complete_callback(uint32_t total_count) ;
 
 #endif /* __TRIGGER_H */
