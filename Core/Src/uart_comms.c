@@ -9,9 +9,12 @@
 #include "main.h"
 #include "module_manager.h"
 #include "uart_comms.h"
+#include "trigger.h"
 #include "utils.h"
-#include <string.h>
 #include "usbd_cdc_if.h"
+
+#include <string.h>
+#include <stdbool.h>
 
 #define ONEWIRE_TIMEOUT 1000
 #define TX_TIMEOUT 1000
@@ -31,9 +34,16 @@ volatile uint8_t rx_ow_callout_flag = 0;
 volatile uint8_t tx_ow_callout_flag = 0;
 volatile uint16_t ow_packetid = 0;
 
+volatile bool async_enabled = false;
+
+extern float last_temperature;
+extern float ambient_temperature;
+
 static uint16_t ow_packet_count;
 static UartPacket ow_send_packet;
 static UartPacket ow_receive_packet;
+static UartPacket ow_data_packet;
+static uint8_t owDataBuffer[256] = {0};
 
 static uint16_t get_ow_next_packetID(){
 	ow_packet_count++;
@@ -126,7 +136,7 @@ static void comms_interface_send(UartPacket* pResp)
     txBuffer[bufferIndex++] = OW_START_BYTE;
     txBuffer[bufferIndex++] = pResp->id >> 8;
     txBuffer[bufferIndex++] = pResp->id & 0xFF;
-    txBuffer[bufferIndex++] = OW_RESP;
+    txBuffer[bufferIndex++] = pResp->packet_type;
     txBuffer[bufferIndex++] = pResp->command;
     txBuffer[bufferIndex++] = pResp->addr;
     txBuffer[bufferIndex++] = pResp->reserved;
@@ -721,4 +731,91 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == CALL_OUT_UART.Instance) {
 
     }
+}
+
+void pulsetrain_complete_callback(uint32_t curr_count, uint32_t total_count) {
+	if(async_enabled){
+		int tx_temp_int = (int)(last_temperature * 10);  // e.g. 32.6 → 326
+		int amb_temp_int = (int)(ambient_temperature * 10);  // e.g. 32.6 → 326
+        // Format full status string
+        int len = snprintf((char*)owDataBuffer, sizeof(owDataBuffer),
+            "STATUS:RUNNING,"
+            "MODE:%s,"
+            "PULSE_TRAIN:[%lu/%lu],"
+            "PULSE:[%lu/%lu],"
+            "TEMP_TX:%d.%d,"
+            "TEMP_AMBIENT:%d.%d",
+			get_trigger_mode_str(),
+            (unsigned long)curr_count,
+            (unsigned long)total_count,
+            (unsigned long)0,
+            (unsigned long)0,
+			tx_temp_int/10,
+			abs(tx_temp_int % 10),
+			amb_temp_int/10,
+			abs(amb_temp_int % 10)
+        );
+
+        if (len < 0 || len >= sizeof(owDataBuffer)) {
+            // Handle truncation or error
+            len = 0;
+        }
+
+		// Called after pulse trains are done
+		ow_data_packet.packet_type = OW_DATA;
+		ow_data_packet.id = 0;
+		ow_data_packet.addr = 0;
+		ow_data_packet.reserved = 0;
+		ow_data_packet.data_len = len;
+		ow_data_packet.data = owDataBuffer;
+		comms_interface_send(&ow_data_packet);
+	}
+
+}
+
+// STATUS:RUNNING,MODE:SEQUENCE,PULSE_TRAIN:[2/5],PULSE:[3/10],TEMP_TX:32.6,TEMP_AMBIENT:29.1
+void sequence_complete_callback(uint32_t total_count) {
+
+	if(async_enabled){
+
+		int tx_temp_int = (int)(last_temperature * 10);  // e.g. 32.6 → 326
+		int amb_temp_int = (int)(ambient_temperature * 10);  // e.g. 32.6 → 326
+
+        // Format full status string
+        int len = snprintf((char*)owDataBuffer, sizeof(owDataBuffer),
+            "STATUS:STOPPED,"
+            "MODE:%s,"
+            "PULSE_TRAIN:[%lu/%lu],"
+            "PULSE:[%lu/%lu],"
+            "TEMP_TX:%d.%d,"
+            "TEMP_AMBIENT:%d.%d",
+			get_trigger_mode_str(),
+            (unsigned long)total_count,
+            (unsigned long)total_count,
+            (unsigned long)0,
+            (unsigned long)0,
+			tx_temp_int/10,
+			abs(tx_temp_int % 10),
+			amb_temp_int/10,
+			abs(amb_temp_int % 10)
+        );
+
+        if (len < 0 || len >= sizeof(owDataBuffer)) {
+            // Handle truncation or error
+            len = 0;
+        }
+
+		// Called after pulse trains are done
+		ow_data_packet.packet_type = OW_DATA;
+		ow_data_packet.id = 0;
+		ow_data_packet.addr = 0;
+		ow_data_packet.reserved = 0;
+		ow_data_packet.data_len = len;
+		ow_data_packet.data = owDataBuffer;
+		comms_interface_send(&ow_data_packet);
+	}
+}
+
+void pulse_complete_callback(uint32_t curr_count, uint32_t total_count) {
+    // Called after pulse is complete not supported
 }

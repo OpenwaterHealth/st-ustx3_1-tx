@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 
-#define COMMAND_MAX_SIZE 256
+#define COMMAND_MAX_SIZE 384
 #define ONEWIRE_MAX_SIZE 48
 
 // Configuration: each module has two transmitters; adjust as necessary.
@@ -64,6 +64,7 @@ typedef enum {
 	OW_CMD_HWID = 0x05,
 	OW_CMD_GET_TEMP = 0x06,
 	OW_CMD_GET_AMBIENT = 0x07,
+	OW_CMD_ASYNC = 0x09,
 	OW_CMD_DISCOVERY = 0x0C,
 	OW_CMD_DFU = 0x0D,
 	OW_CMD_NOP = 0x0E,

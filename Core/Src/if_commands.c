@@ -26,6 +26,7 @@ extern bool _enter_dfu;
 
 extern int tx_count;
 extern TX7332 transmitters[2];
+extern bool async_enabled;
 
 static uint32_t id_words[3] = {0};
 static char retTriggerJson[0xFF];
@@ -283,7 +284,7 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->addr = cmd->addr;
 			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = 0;
-			if(!start_trigger_pulse())
+			if(start_trigger_pulse() != TRIGGER_STATUS_RUNNING)
 			{
 				uartResp->packet_type = OW_ERROR;
 			}
@@ -293,7 +294,7 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->addr = cmd->addr;
 			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = 0;
-			if(!stop_trigger_pulse())
+			if(stop_trigger_pulse() != TRIGGER_STATUS_READY)
 			{
 				uartResp->packet_type = OW_ERROR;
 			}
@@ -357,6 +358,15 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			if(HAL_TIM_Base_Start_IT(&htim17) != HAL_OK){
 				uartResp->packet_type = OW_ERROR;
 			}
+			break;
+		case OW_CMD_ASYNC:
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			if(cmd->data_len == 1){
+				async_enabled = cmd->data[0] == 1? true: false;
+			}
+			uartResp->reserved = async_enabled?1:0;
+			uartResp->data_len = 0;
 			break;
 		default:
 			uartResp->addr = 0;
