@@ -19,5 +19,6 @@
 void Thermistor_Start(ADC_HandleTypeDef *hadc, float vRef, float rPullUp);
 void Thermistor_Stop(void);
 float Thermistor_ReadTemperature(void);
+void TEMP_TIM6_IRQHandler(void);
 
 #endif /* INC_THERMISTOR_H_ */

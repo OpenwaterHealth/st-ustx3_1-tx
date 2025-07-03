@@ -152,7 +152,7 @@ extern uint8_t found_address_count; // Counter for found addresses
 extern CRC_HandleTypeDef hcrc;
 extern SPI_HandleTypeDef hspi1;
 extern TIM_HandleTypeDef htim14;
-extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef h;
 extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim15;
 extern TIM_HandleTypeDef htim17;
@@ -164,7 +164,7 @@ extern UART_HandleTypeDef huart3;
 #define CALL_IN_UART huart2
 #define CDC_TIMER htim14
 #define TRIGGER_TIMER htim15
-#define HIRES_TIMER htim2
+#define HIRES_TIMER h
 #define LORES_TIMER htim3
 #define RESET_TIMER htim17
 

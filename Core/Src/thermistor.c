@@ -60,3 +60,17 @@ float Thermistor_ReadTemperature(void)
     return 0;
 }
 
+void TEMP_TIM6_IRQHandler(void)
+{
+    // Check if the timer interrupt is triggered
+    if (__HAL_TIM_GET_FLAG(&htim6, TIM_FLAG_UPDATE) != RESET)
+    {
+        // Clear the interrupt flag
+        __HAL_TIM_CLEAR_IT(&htim6, TIM_IT_UPDATE);
+
+        // Read temperature and process it (e.g., send to a display or log)
+        float temperature = Thermistor_ReadTemperature();
+        // Process the temperature value as needed
+        // For example, you can send it over UART or store it in a variable
+    }
+}
