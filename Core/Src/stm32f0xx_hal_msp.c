@@ -479,6 +479,20 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
 
     /* USER CODE END TIM3_MspInit 1 */
   }
+  else if(htim_base->Instance==TIM7)
+  {
+    /* USER CODE BEGIN TIM7_MspInit 0 */
+
+    /* USER CODE END TIM7_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_TIM7_CLK_ENABLE();
+    /* TIM7 interrupt Init */
+    HAL_NVIC_SetPriority(TIM7_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(TIM7_IRQn);
+    /* USER CODE BEGIN TIM7_MspInit 1 */
+
+    /* USER CODE END TIM7_MspInit 1 */
+  }
   else if(htim_base->Instance==TIM14)
   {
     /* USER CODE BEGIN TIM14_MspInit 0 */
@@ -614,6 +628,20 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base)
 
     /* USER CODE END TIM3_MspDeInit 1 */
   }
+  else if(htim_base->Instance==TIM7)
+  {
+    /* USER CODE BEGIN TIM7_MspDeInit 0 */
+
+    /* USER CODE END TIM7_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM7_CLK_DISABLE();
+
+    /* TIM7 interrupt DeInit */
+    HAL_NVIC_DisableIRQ(TIM7_IRQn);
+    /* USER CODE BEGIN TIM7_MspDeInit 1 */
+
+    /* USER CODE END TIM7_MspDeInit 1 */
+  }
   else if(htim_base->Instance==TIM14)
   {
     /* USER CODE BEGIN TIM14_MspDeInit 0 */
@@ -745,7 +773,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
 
     /* USART3 DMA Init */
     /* USART3_RX Init */
-    hdma_usart3_rx.Instance = DMA1_Channel3;
+    hdma_usart3_rx.Instance = DMA1_Channel6;
     hdma_usart3_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
     hdma_usart3_rx.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_usart3_rx.Init.MemInc = DMA_MINC_ENABLE;
@@ -758,12 +786,10 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
       Error_Handler();
     }
 
-    __HAL_DMA_REMAP_CHANNEL_ENABLE(DMA_REMAP_USART3_DMA_CH32);
-
     __HAL_LINKDMA(huart,hdmarx,hdma_usart3_rx);
 
     /* USART3_TX Init */
-    hdma_usart3_tx.Instance = DMA1_Channel2;
+    hdma_usart3_tx.Instance = DMA1_Channel7;
     hdma_usart3_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
     hdma_usart3_tx.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_usart3_tx.Init.MemInc = DMA_MINC_ENABLE;
@@ -775,8 +801,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     {
       Error_Handler();
     }
-
-    __HAL_DMA_REMAP_CHANNEL_ENABLE(DMA_REMAP_USART3_DMA_CH32);
 
     __HAL_LINKDMA(huart,hdmatx,hdma_usart3_tx);
 

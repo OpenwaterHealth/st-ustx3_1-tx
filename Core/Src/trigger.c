@@ -1,6 +1,7 @@
 #include "trigger.h"
 #include "stm32f0xx_hal.h"
 #include "main.h"
+#include "thermistor.h"
 
  #include "jsmn.h"
 
@@ -411,6 +412,7 @@ uint8_t start_trigger_pulse(void) {
     // Start PWM
     HAL_TIM_PWM_Start(&TRIGGER_TIMER, TIM_CHANNEL_2);
     HAL_TIM_Base_Start_IT(&LORES_TIMER);
+	HAL_TIM_Base_Start_IT(&TEMPERATURE_TIMER);
     _timerDataConfig.TriggerStatus = TRIGGER_STATUS_RUNNING;
     return TRIGGER_STATUS_RUNNING;
 }
@@ -421,6 +423,7 @@ uint8_t stop_trigger_pulse(void) {
     HAL_TIM_PWM_Stop(&TRIGGER_TIMER, TIM_CHANNEL_2);
     HAL_TIM_Base_Stop_IT(&LORES_TIMER);
     HAL_TIM_Base_Stop_IT(&HIRES_TIMER);
+	HAL_TIM_Base_Stop_IT(&TEMPERATURE_TIMER);
     _timerDataConfig.TriggerStatus = TRIGGER_STATUS_READY;
     return TRIGGER_STATUS_READY;
 }

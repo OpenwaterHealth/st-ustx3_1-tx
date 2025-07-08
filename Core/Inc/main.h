@@ -154,6 +154,7 @@ extern SPI_HandleTypeDef hspi1;
 extern TIM_HandleTypeDef htim14;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
+extern TIM_HandleTypeDef htim7;
 extern TIM_HandleTypeDef htim15;
 extern TIM_HandleTypeDef htim17;
 
@@ -167,6 +168,7 @@ extern UART_HandleTypeDef huart3;
 #define HIRES_TIMER htim2
 #define LORES_TIMER htim3
 #define RESET_TIMER htim17
+#define TEMPERATURE_TIMER htim7
 
 extern I2C_HandleTypeDef* GLOBAL_I2C_DEVICE;
 extern I2C_HandleTypeDef* LOCAL_I2C_DEVICE;

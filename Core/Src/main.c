@@ -74,6 +74,7 @@ SPI_HandleTypeDef hspi1;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim7;
 TIM_HandleTypeDef htim14;
 TIM_HandleTypeDef htim15;
 TIM_HandleTypeDef htim17;
@@ -87,7 +88,7 @@ DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
 
-uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 12};
+uint8_t FIRMWARE_VERSION_DATA[3] = {1, 0, 13};
 uint32_t id_words[3] = {0};
 
 // Define the pointers
@@ -118,6 +119,7 @@ static void MX_TIM14_Init(void);
 static void MX_TIM17_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM7_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -366,6 +368,7 @@ int main(void)
   MX_TIM17_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
+  MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
   SetPinsHighImpedance();
 
@@ -989,6 +992,44 @@ static void MX_TIM3_Init(void)
 }
 
 /**
+  * @brief TIM7 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM7_Init(void)
+{
+
+  /* USER CODE BEGIN TIM7_Init 0 */
+
+  /* USER CODE END TIM7_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 48000-1;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 500-1;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
+
+  /* USER CODE END TIM7_Init 2 */
+
+}
+
+/**
   * @brief TIM14 Initialization Function
   * @param None
   * @retval None
@@ -1406,6 +1447,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim->Instance == TIM2)
   {
     TRIG_TIM2_IRQHandler();
+  }
+
+  if (htim->Instance == TIM7)
+  {
+    TEMP_TIM7_IRQHandler();
   }
 
   /* USER CODE END Callback 0 */
