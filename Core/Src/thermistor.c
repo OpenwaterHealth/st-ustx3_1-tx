@@ -5,12 +5,16 @@
  *      Author: GeorgeVigelette
  */
 #include "thermistor.h"
+#include "i2c_master.h"
 #include <math.h>
 
 // Private variables
 static ADC_HandleTypeDef *adcHandle = NULL;  // Pointer to the ADC handle
 static float referenceVoltage;        // ADC reference voltage
 static float pullUpResistance;        // Pull-up resistance value
+
+volatile float tx_temperature = 0.0f;
+volatile float ambient_temperature = 0.0f;
 
 // Initialize the thermistor
 void Thermistor_Start(ADC_HandleTypeDef *hadc, float vRef, float rPullUp)
@@ -21,6 +25,7 @@ void Thermistor_Start(ADC_HandleTypeDef *hadc, float vRef, float rPullUp)
 
     // Start the ADC in continuous mode
     HAL_ADC_Start(adcHandle);
+    // HAL_TIM_Base_Start_IT(&TEMPERATURE_TIMER);  // Start the timer for periodic temperature reading
 }
 
 void Thermistor_Stop()
@@ -60,3 +65,8 @@ float Thermistor_ReadTemperature(void)
     return 0;
 }
 
+void TEMP_TIM7_IRQHandler(void)
+{
+    tx_temperature = Thermistor_ReadTemperature();
+    ambient_temperature = MAX31875_ReadTemperature();
+}

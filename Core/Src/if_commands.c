@@ -30,8 +30,6 @@ extern bool async_enabled;
 
 static uint32_t id_words[3] = {0};
 static char retTriggerJson[0xFF];
-volatile float last_temperature = 0;
-volatile float ambient_temperature = 0;
 
 uint8_t send_buff[I2C_BUFFER_SIZE] = {0};
 uint8_t receive_status[I2C_STATUS_SIZE] = {0};
@@ -171,11 +169,11 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			uartResp->data = (uint8_t *)&id_words;
 			break;
 		case OW_CMD_GET_TEMP:
-			last_temperature = 32.5;
+			tx_temperature = 32.5;
 			uartResp->id = cmd->id;
 			uartResp->command = cmd->command;
 			uartResp->data_len = 4;
-			uartResp->data = (uint8_t *)&last_temperature;
+			uartResp->data = (uint8_t *)&tx_temperature;
 			break;
 		case OW_CMD_GET_AMBIENT:
 			ambient_temperature = 30.02;
@@ -266,11 +264,11 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->data = (uint8_t *)&id_words;
 			break;
 		case OW_CMD_GET_TEMP:
-			last_temperature = Thermistor_ReadTemperature();
+			tx_temperature = Thermistor_ReadTemperature();
 			uartResp->id = cmd->id;
 			uartResp->command = cmd->command;
 			uartResp->data_len = 4;
-			uartResp->data = (uint8_t *)&last_temperature;
+			uartResp->data = (uint8_t *)&tx_temperature;
 			break;
 		case OW_CMD_GET_AMBIENT:
 			ambient_temperature = MAX31875_ReadTemperature();
