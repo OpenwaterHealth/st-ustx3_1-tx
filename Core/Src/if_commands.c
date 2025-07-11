@@ -69,10 +69,10 @@ static void process_i2c_read_status(UartPacket *uartResp, UartPacket* cmd, uint8
 		return;
 	}else{
 		uartResp->id = cmd->id;
-		uartResp->packet_type = OW_ERROR;
+		uartResp->packet_type = cmd->packet_type; // do I need to comment this out?
 		uartResp->command = cmd->command;
-		uartResp->data_len = 0;
-		uartResp->data = NULL;
+		uartResp->data_len = cmd->data_len;
+		uartResp->data = cmd->data;
 	}
 
 	rx_len = read_status_register_of_slave_global(slave_addr, receive_status, I2C_STATUS_SIZE);
@@ -125,6 +125,8 @@ static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t m
 
 static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 {
+	uint8_t module_id = ModuleManager_GetModuleIndex(cmd->addr);
+
 	switch (cmd->command)
 	{
 		case OW_CMD_PING:
@@ -169,14 +171,18 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			uartResp->data = (uint8_t *)&id_words;
 			break;
 		case OW_CMD_GET_TEMP:
-			tx_temperature = 32.5;
-			uartResp->id = cmd->id;
-			uartResp->command = cmd->command;
-			uartResp->data_len = 4;
-			uartResp->data = (uint8_t *)&tx_temperature;
+			if (module_id == 0){
+				uartResp->id = cmd->id;
+				uartResp->command = cmd->command;
+				uartResp->data_len = 4;
+				uartResp->data = (uint8_t *)&tx_temperature;
+			}else{
+				process_i2c_forward(uartResp, cmd, module_id);
+				uartResp->data = (uint8_t *)&tx_temperature_2;
+			}
 			break;
 		case OW_CMD_GET_AMBIENT:
-			ambient_temperature = 30.02;
+			ambient_temperature = 0;
 			uartResp->id = cmd->id;
 			uartResp->command = cmd->command;
 			uartResp->data_len = 4;
@@ -376,7 +382,7 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 
 }
 
-static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
+static void  TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 {
 	uint8_t module_id = 0;
 	uint16_t reg_address = 0;
