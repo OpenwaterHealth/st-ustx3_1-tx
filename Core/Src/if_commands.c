@@ -226,6 +226,9 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 
 static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 {
+	uint8_t module_id = 0;
+	// uint8_t module_id = ModuleManager_GetModuleIndex(cmd->addr);
+
 	switch (cmd->command)
 	{
 		case OW_CMD_PING:
@@ -239,11 +242,17 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->reserved = cmd->reserved;
 			break;
 		case OW_CMD_VERSION:
-			uartResp->command = cmd->command;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
-			uartResp->data_len = sizeof(FIRMWARE_VERSION_DATA);
-			uartResp->data = FIRMWARE_VERSION_DATA;
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			// if (cmd->addr )
+			if (module_id == 0){
+				uartResp->command = cmd->command;
+				uartResp->addr = cmd->addr;
+				uartResp->reserved = cmd->reserved;
+				uartResp->data_len = sizeof(FIRMWARE_VERSION_DATA);
+				uartResp->data = FIRMWARE_VERSION_DATA;
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
 			break;
 		case OW_CMD_ECHO:
 			// exact copy
@@ -255,9 +264,15 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->data = cmd->data;
 			break;
 		case OW_CMD_TOGGLE_LED:
-			uartResp->id = cmd->id;
-			uartResp->command = cmd->command;
-			HAL_GPIO_TogglePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin); //no led pins declared
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			if (module_id == 0x00)
+			{
+				uartResp->id = cmd->id;
+				uartResp->command = cmd->command;
+				HAL_GPIO_TogglePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin); //no led pins declared
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
 			break;
 		case OW_CMD_HWID:
 			uartResp->command = OW_CMD_HWID;
@@ -270,11 +285,21 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->data = (uint8_t *)&id_words;
 			break;
 		case OW_CMD_GET_TEMP:
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
 			tx_temperature = Thermistor_ReadTemperature();
-			uartResp->id = cmd->id;
-			uartResp->command = cmd->command;
-			uartResp->data_len = 4;
-			uartResp->data = (uint8_t *)&tx_temperature;
+			if (module_id == 0){
+				uartResp->id = cmd->id;
+				uartResp->command = cmd->command;
+				uartResp->data_len = 4;
+				uartResp->data = (uint8_t *)&tx_temperature;
+			}else{
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
+			// tx_temperature = Thermistor_ReadTemperature();
+			// uartResp->id = cmd->id;
+			// uartResp->command = cmd->command;
+			// uartResp->data_len = 4;
+			// uartResp->data = (uint8_t *)&tx_temperature;
 			break;
 		case OW_CMD_GET_AMBIENT:
 			ambient_temperature = MAX31875_ReadTemperature();
