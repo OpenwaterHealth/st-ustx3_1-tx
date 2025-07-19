@@ -12,7 +12,7 @@
 #include "i2c_protocol.h"
 #include <stdio.h>
 
-extern I2C_STATUS_Packet* status_packet;
+extern I2C_RETURN_Packet* return_Packet;
 extern I2C_TX_Packet* data_available;
 
 typedef enum {

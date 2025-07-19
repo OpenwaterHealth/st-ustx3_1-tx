@@ -106,7 +106,7 @@ uint8_t send_buffer_to_slave_global(uint8_t slave_addr, uint8_t* pBuffer, uint16
 
 uint8_t read_status_register_of_slave_local(uint8_t slave_addr, uint8_t* pBuffer, uint16_t max_len)
 {
-	uint8_t rx_len = sizeof(I2C_STATUS_Packet);
+	uint8_t rx_len = sizeof(I2C_RETURN_Packet);
 	// Check if the I2C handle is valid
     if (HAL_I2C_GetState(LOCAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
     	printf("===> ERROR I2C Not in ready state\r\n");
@@ -139,7 +139,7 @@ uint8_t read_status_register_of_slave_local(uint8_t slave_addr, uint8_t* pBuffer
 
 uint8_t read_status_register_of_slave_global(uint8_t slave_addr, uint8_t* pBuffer, uint16_t max_len)
 {
-	uint8_t rx_len = sizeof(I2C_STATUS_Packet);
+	uint8_t rx_len = sizeof(I2C_RETURN_Packet);
 	// Check if the I2C handle is valid
     if (HAL_I2C_GetState(GLOBAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
     	printf("===> ERROR I2C Not in ready state\r\n");

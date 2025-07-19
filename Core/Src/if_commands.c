@@ -57,7 +57,7 @@ static void process_i2c_read_status(UartPacket *uartResp, UartPacket* cmd, uint8
 {
 	uint16_t rx_len = 0;
 	uint8_t slave_addr = ModuleManager_GetModule(module_id)->i2c_address;
-	I2C_STATUS_Packet ret_i2c_status;
+	I2C_RETURN_Packet ret_i2c_status;
 
 	if(module_id == 0){
 		printf("No Module found\r\n");
@@ -77,7 +77,7 @@ static void process_i2c_read_status(UartPacket *uartResp, UartPacket* cmd, uint8
 
 	rx_len = read_status_register_of_slave_global(slave_addr, receive_status, I2C_STATUS_SIZE);
 	printf("Received %d Bytes \r\n", rx_len);
-	if(i2c_status_packet_fromBuffer(receive_status, &ret_i2c_status)){
+	if(i2c_return_packet_fromBuffer(receive_status, &ret_i2c_status)){
 		if(ret_i2c_status.status == 0) uartResp->packet_type = OW_RESP;
 	}
 }

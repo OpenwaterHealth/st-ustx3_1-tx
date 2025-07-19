@@ -34,8 +34,8 @@ uint8_t rec_data_buffer[128] = {0};
 
 I2C_TX_Packet tx_packet;
 I2C_TX_Packet rx_packet;
-I2C_STATUS_Packet _status_packet;
-I2C_STATUS_Packet* status_packet = &_status_packet;
+I2C_RETURN_Packet _return_Packet;
+I2C_RETURN_Packet* return_Packet = &_return_Packet;
 
 __IO uint16_t rx_count = 0;
 __IO uint16_t tx_packet_count = 0;
@@ -65,11 +65,11 @@ void I2C_Slave_Init(uint8_t addr) {
   memset(status_buffer, 0, I2C_STATUS_SIZE);
 
 
-  _status_packet.id = 00;
-  _status_packet.status = 0x00; // processing
-  _status_packet.cmd = 0x00;
-  _status_packet.reserved = 0;
-  _status_packet.data_len = 0;
+  _return_Packet.id = 00;
+  _return_Packet.status = 0x00; // processing
+  _return_Packet.cmd = 0x00;
+  _return_Packet.reserved = 0;
+  _return_Packet.data_len = 0;
 
   if(HAL_I2C_EnableListen_IT(GLOBAL_I2C_DEVICE) != HAL_OK) {
 	  // Handle the error if reinitialization fails
@@ -112,10 +112,10 @@ void I2C_Process() {
 
 
 	// Process command
-	status_packet->id = data_available->id;
-	status_packet->cmd = data_available->cmd;
-	status_packet->status = 0xFF;
-	status_packet->data_len = 0;
+	return_Packet->id = data_available->id;
+	return_Packet->cmd = data_available->cmd;
+	return_Packet->status = 0xFF;
+	return_Packet->data_len = 0;
 
 	data_available = NULL;
 
@@ -138,13 +138,13 @@ void I2C_Process() {
 	// convert response to i2c return
 	if(resp.packet_type != OW_ERROR)
 	{
-		status_packet->status = OW_SUCCESS;
+		return_Packet->status = OW_SUCCESS;
 	}
 	else
 	{
-		status_packet->status = OW_ERROR;
+		return_Packet->status = OW_ERROR;
 	}
-	set_transmit_buffer(NULL, data_available->id, data_available->cmd, status_packet->status);
+	set_transmit_buffer(NULL, data_available->id, data_available->cmd, return_Packet->status);
 
 }
 
@@ -152,10 +152,10 @@ bool set_transmit_buffer(I2C_TX_Packet* packet, uint16_t packet_id, uint8_t comm
 {
 	bool ret = false;
 
-	_status_packet.cmd = command;
-	_status_packet.status = status_code;
-	_status_packet.data_len = 0;
-	_status_packet.id = packet_id;
+	_return_Packet.cmd = command;
+	_return_Packet.status = status_code;
+	_return_Packet.data_len = 0;
+	_return_Packet.id = packet_id;
 
 	memset(tx_buffer, 0, I2C_BUFFER_SIZE);
 	if(packet)
@@ -168,13 +168,13 @@ bool set_transmit_buffer(I2C_TX_Packet* packet, uint16_t packet_id, uint8_t comm
 	}else{
 		tx_packet.id = packet_id;
 		tx_packet.cmd = command;
-		tx_packet.reserved = _status_packet.reserved;
+		tx_packet.reserved = _return_Packet.reserved;
 		tx_packet.data_len = 0;
 		tx_packet.pData = NULL;
 		if(i2c_packet_toBuffer(&tx_packet, tx_buffer)>0) ret = true;
 	}
 	if(!ret){
-		_status_packet.status = OW_INVALID_PACKET;
+		_return_Packet.status = OW_INVALID_PACKET;
 	}
 	return ret;
 }
@@ -218,9 +218,9 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
 		if(tx_position == 0)
 		{
 			// read status
-			_status_packet.data_len = tx_packet.pkt_len;
-			tx_bytes = i2c_status_packet_toBuffer(status_packet, status_buffer);  // update status packet
-			//i2c_status_packet_print(status_packet);
+			_return_Packet.data_len = tx_packet.pkt_len;
+			tx_bytes = i2c_return_packet_toBuffer(return_Packet, status_buffer);  // update status packet
+			//i2c_status_packet_print(return_Packet);
 			send_buffer = status_buffer;
 		}else{
 			// read buffer
@@ -279,9 +279,9 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *I2cHandle)
 			is_first_byte_received=0;
 			// process data
 			i2c_packet_fromBuffer(rx_buffer, &rx_packet);
-			_status_packet.id = rx_packet.id;
-			_status_packet.cmd = rx_packet.cmd;
-			_status_packet.status = 0x00;
+			_return_Packet.id = rx_packet.id;
+			_return_Packet.cmd = rx_packet.cmd;
+			_return_Packet.status = 0x00;
 			// printBuffer(rx_buffer, rx_count);
 			// process or send for processing
 			data_available = &rx_packet;
