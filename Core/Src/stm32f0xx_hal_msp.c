@@ -714,7 +714,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
 
     /* USART2 DMA Init */
     /* USART2_RX Init */
-    hdma_usart2_rx.Instance = DMA1_Channel5;
+    hdma_usart2_rx.Instance = DMA1_Channel6;
     hdma_usart2_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
     hdma_usart2_rx.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_usart2_rx.Init.MemInc = DMA_MINC_ENABLE;
@@ -727,10 +727,12 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
       Error_Handler();
     }
 
+    __HAL_DMA_REMAP_CHANNEL_ENABLE(DMA_REMAP_USART2_DMA_CH67);
+
     __HAL_LINKDMA(huart,hdmarx,hdma_usart2_rx);
 
     /* USART2_TX Init */
-    hdma_usart2_tx.Instance = DMA1_Channel4;
+    hdma_usart2_tx.Instance = DMA1_Channel7;
     hdma_usart2_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
     hdma_usart2_tx.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_usart2_tx.Init.MemInc = DMA_MINC_ENABLE;
@@ -742,6 +744,8 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     {
       Error_Handler();
     }
+
+    __HAL_DMA_REMAP_CHANNEL_ENABLE(DMA_REMAP_USART2_DMA_CH67);
 
     __HAL_LINKDMA(huart,hdmatx,hdma_usart2_tx);
 
@@ -773,7 +777,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
 
     /* USART3 DMA Init */
     /* USART3_RX Init */
-    hdma_usart3_rx.Instance = DMA1_Channel6;
+    hdma_usart3_rx.Instance = DMA1_Channel3;
     hdma_usart3_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
     hdma_usart3_rx.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_usart3_rx.Init.MemInc = DMA_MINC_ENABLE;
@@ -786,10 +790,12 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
       Error_Handler();
     }
 
+    __HAL_DMA_REMAP_CHANNEL_ENABLE(DMA_REMAP_USART3_DMA_CH32);
+
     __HAL_LINKDMA(huart,hdmarx,hdma_usart3_rx);
 
     /* USART3_TX Init */
-    hdma_usart3_tx.Instance = DMA1_Channel7;
+    hdma_usart3_tx.Instance = DMA1_Channel2;
     hdma_usart3_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
     hdma_usart3_tx.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_usart3_tx.Init.MemInc = DMA_MINC_ENABLE;
@@ -801,6 +807,8 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     {
       Error_Handler();
     }
+
+    __HAL_DMA_REMAP_CHANNEL_ENABLE(DMA_REMAP_USART3_DMA_CH32);
 
     __HAL_LINKDMA(huart,hdmatx,hdma_usart3_tx);
 

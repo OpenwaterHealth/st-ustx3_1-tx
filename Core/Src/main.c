@@ -1336,11 +1336,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(SYSTEM_RDY_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : TX1_SHUTZ_Pin */
-  GPIO_InitStruct.Pin = TX1_SHUTZ_Pin;
+  /*Configure GPIO pins : TX1_SHUTZ_Pin RX_RDY_Pin */
+  GPIO_InitStruct.Pin = TX1_SHUTZ_Pin|RX_RDY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(TX1_SHUTZ_GPIO_Port, &GPIO_InitStruct);
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : INT_Pin */
   GPIO_InitStruct.Pin = INT_Pin;
@@ -1359,12 +1359,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : RX_RDY_Pin */
-  GPIO_InitStruct.Pin = RX_RDY_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(RX_RDY_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : TX2_SHUTZ_Pin */
   GPIO_InitStruct.Pin = TX2_SHUTZ_Pin;
@@ -1498,8 +1492,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
