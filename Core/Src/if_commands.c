@@ -278,14 +278,14 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 		case OW_CMD_HWID:
 			module_id = ModuleManager_GetModuleIndex(cmd->addr);
 			if (module_id == 0){
-			uartResp->command = OW_CMD_HWID;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
-			id_words[0] = HAL_GetUIDw0();
-			id_words[1] = HAL_GetUIDw1();
-			id_words[2] = HAL_GetUIDw2();
-			uartResp->data_len = 16;
-			uartResp->data = (uint8_t *)&id_words;
+				uartResp->command = OW_CMD_HWID;
+				uartResp->addr = cmd->addr;
+				uartResp->reserved = cmd->reserved;
+				id_words[0] = HAL_GetUIDw0();
+				id_words[1] = HAL_GetUIDw1();
+				id_words[2] = HAL_GetUIDw2();
+				uartResp->data_len = 16;
+				uartResp->data = (uint8_t *)&id_words;
 			} else {
 				process_i2c_forward(uartResp, cmd, module_id);
 			}
