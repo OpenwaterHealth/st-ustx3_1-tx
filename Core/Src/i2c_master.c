@@ -8,6 +8,7 @@
 #include "main.h"
 #include "i2c_protocol.h"
 #include "i2c_master.h"
+#include "i2c_slave.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -163,6 +164,30 @@ uint8_t read_status_register_of_slave_global(uint8_t slave_addr, uint8_t* pBuffe
         /* Error_Handler() function is called when error occurs. */
         Error_Handler();
     }
+    // flash_led();
+    uint16_t id = pBuffer[0] | (pBuffer[1] << 8);
+    if (id == 6)
+    {
+        // flash_led();
+    }
+
+    uint8_t data_len = pBuffer[5]; // data length
+    if (data_len == 16 || data_len == 3)
+    {
+        // flash_led();
+    }
+    rx_len = data_len + 2 + 6; // 2 bytes for CRC and 6 bytes for header and n bytes for data
+    uint8_t* new_ptr = pBuffer + 6; // move pointer to data
+
+   
+
+
+    if(HAL_I2C_Mem_Read(GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), 0x00, I2C_MEMADD_SIZE_8BIT, new_ptr, data_len+2, HAL_MAX_DELAY)!= HAL_OK)
+    {
+        /* Error_Handler() function is called when error occurs. */
+        Error_Handler();
+    }
+    // flash_led();
 
 #endif
 

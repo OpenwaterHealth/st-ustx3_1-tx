@@ -163,7 +163,6 @@ void I2C_Process() {
 		status_packet->status = OW_ERROR;
 		set_transmit_buffer(NULL, data_available->id, data_available->cmd, status_packet->status);
 	}
-	set_transmit_buffer(NULL, data_available->id, data_available->cmd, status_packet->status);
 
 }
 
