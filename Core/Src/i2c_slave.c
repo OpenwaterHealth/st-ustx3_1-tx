@@ -91,6 +91,18 @@ void i2c_print_info() {
 }
 
 
+void flash_led(void)
+{
+	HAL_GPIO_TogglePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin);
+	HAL_Delay(300);
+	HAL_GPIO_TogglePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin);
+	HAL_Delay(300);
+	HAL_GPIO_TogglePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin);
+	HAL_Delay(300);
+	HAL_GPIO_TogglePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin);
+	HAL_Delay(300);
+}
+
 void I2C_Process() {
 	if (!data_available) return;
 
@@ -139,10 +151,17 @@ void I2C_Process() {
 	if(resp.packet_type != OW_ERROR)
 	{
 		status_packet->status = OW_SUCCESS;
+		ret_data.id = resp.id;
+		ret_data.cmd = resp.command;
+		ret_data.reserved = resp.reserved;
+		ret_data.data_len = resp.data_len;
+		ret_data.pData = resp.data;
+		set_transmit_buffer(&ret_data, data_available->id, data_available->cmd, status_packet->status);
 	}
 	else
 	{
 		status_packet->status = OW_ERROR;
+		set_transmit_buffer(NULL, data_available->id, data_available->cmd, status_packet->status);
 	}
 	set_transmit_buffer(NULL, data_available->id, data_available->cmd, status_packet->status);
 

@@ -7,6 +7,7 @@
 
 
 #include "i2c_protocol.h"
+#include "i2c_slave.h"
 
 #include "utils.h"
 #include <stdio.h>
@@ -96,6 +97,10 @@ size_t i2c_packet_toBuffer(I2C_TX_Packet* pTX, uint8_t* buffer) {
 
     // Write Data Length
     *buffer = pTX->data_len;
+    if (*buffer == 16 || *buffer == 3)
+    {
+        //flash_led();
+    }
     buffer++;
 
     // Write Data
@@ -131,6 +136,10 @@ bool i2c_status_packet_fromBuffer(const uint8_t* buffer, I2C_STATUS_Packet* pTX)
     pTX->reserved = *buffer; // Reserved
     buffer++;
     pTX->data_len = *buffer;
+    if (pTX->data_len == 16 || pTX->data_len == 3)
+    {
+        //flash_led();
+    }
     buffer++;
     pTX->crc = (uint16_t)((buffer[1] << 8) | buffer[0]); // CRC (little-endian)
 

@@ -107,14 +107,15 @@ static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t m
 		send_i2c_packet.id = cmd->id;
 		send_i2c_packet.cmd = cmd->command;
 		send_i2c_packet.reserved = (uint8_t)local_tx_idx;
-		send_i2c_packet.data_len = cmd->data_len;
-		send_i2c_packet.pData = cmd->data;
+		send_i2c_packet.data_len = cmd->data_len; // only used for a couple commands
+		send_i2c_packet.pData = cmd->data; // 
 
 	    // i2c_tx_packet_print(&send_i2c_packet);
 
 		send_len = i2c_packet_toBuffer(&send_i2c_packet, send_buff);  // rebuild buffer
 		if(send_buffer_to_slave_global(slave_addr, send_buff, send_len) != 0) { // send buffer to slave
 			uartResp->packet_type = OW_ERROR;
+			flash_led();
 		}else{
 			HAL_Delay(250);
 			process_i2c_read_status(uartResp, cmd, module_id);
@@ -275,6 +276,8 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			}
 			break;
 		case OW_CMD_HWID:
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			if (module_id == 0){
 			uartResp->command = OW_CMD_HWID;
 			uartResp->addr = cmd->addr;
 			uartResp->reserved = cmd->reserved;
@@ -283,6 +286,10 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			id_words[2] = HAL_GetUIDw2();
 			uartResp->data_len = 16;
 			uartResp->data = (uint8_t *)&id_words;
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
+			
 			break;
 		case OW_CMD_GET_TEMP:
 			module_id = ModuleManager_GetModuleIndex(cmd->addr);
