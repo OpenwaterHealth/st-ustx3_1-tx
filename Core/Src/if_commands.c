@@ -21,6 +21,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+#define MAX_NUMBER_OF_PROFILES 16
+
 extern uint8_t FIRMWARE_VERSION_DATA[3];
 extern bool _enter_dfu;
 
@@ -34,12 +36,20 @@ static char retTriggerJson[0xFF];
 uint8_t send_buff[I2C_BUFFER_SIZE] = {0};
 uint8_t receive_status[I2C_STATUS_SIZE] = {0};
 
+typedef struct {
+	uint8_t profile;
+	uint8_t num_pulses;
+} PulseProfile;
+
+PulseProfile pulse_profiles[MAX_NUMBER_OF_PROFILES] = {0};
+
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 static void process_i2c_read_status(UartPacket *uartResp, UartPacket* cmd, uint8_t module_id);
 static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t module_id);
 
 static void print_uart_packet(const UartPacket* packet) {
+#if 0
     printf("ID: 0x%04X\r\n", packet->id);
     printf("Packet Type: 0x%02X\r\n", packet->packet_type);
     printf("Command: 0x%02X\r\n", packet->command);
@@ -50,6 +60,7 @@ static void print_uart_packet(const UartPacket* packet) {
         printf("0x%02X ", packet->data[i]);
     }
     printf("\r\n");
+#endif
 }
 
 
@@ -297,6 +308,40 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 				uartResp->packet_type = OW_ERROR;
 			}
 			break;
+		case OW_CTRL_SET_PROFILE:
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			uartResp->data_len = 0;
+
+			uint8_t value = cmd->data[0];
+
+			TX7332_WriteReg(&transmitters[cmd->addr], 0x1E, 0x00);
+			TX7332_WriteReg(&transmitters[cmd->addr], 0x1E, value);
+			break;
+
+		case OW_CTRL_GET_PROFILE:
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			uartResp->data_len = 1;
+
+			// &transmitters[cmd->addr];
+			uint16_t profile = TX7332_ReadReg(&transmitters[cmd->addr], 0x1E);
+			uint8_t  bit_index = 0;
+			
+			if (profile != 0) {
+				for (uint8_t i = 0; i < 16; i++) {
+					if (profile & (1 << i)) {
+						bit_index = i;
+						break;
+					}
+				}
+			}
+			uartResp->data = (uint8_t *)&profile;
+			break;
+
+
 		case OW_CTRL_SET_SWTRIG:
 			uartResp->command = cmd->command;
 			uartResp->addr = cmd->addr;
@@ -475,6 +520,10 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 		}
 		break;
 	case OW_TX7332_WBLOCK:
+		uint32_t tickstart = 0U;
+		uint32_t elapsed_time = 0U;
+		tickstart = HAL_GetTick();
+		
 		uartResp->command = OW_TX7332_WBLOCK;
 		uartResp->addr = cmd->addr;
 		uartResp->reserved = 0;
@@ -489,6 +538,16 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 
 		if(module_id == 0x00) // local
 		{
+			for (int i=0; i<MAX_NUMBER_OF_PROFILES; i++)
+			{
+				if(pulse_profiles[i].profile == 0 && pulse_profiles[i].num_pulses == 0)
+				{
+					pulse_profiles[i].profile = cmd->data[0];
+					pulse_profiles[i].num_pulses = cmd->data[1];
+					break;
+				}
+			}
+
 			// Unpack 16-bit address (first 2 bytes, little-endian)
 			reg_address = cmd->data[0] | (cmd->data[1] << 8);
 			// Unpack 16-bit address (first 2 bytes, little-endian)
@@ -510,6 +569,8 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 				uartResp->packet_type = OW_ERROR;
 				break;
 			}
+			elapsed_time = HAL_GetTick() - tickstart;
+			
 		}else{
 			process_i2c_forward(uartResp, cmd, module_id);
 		}

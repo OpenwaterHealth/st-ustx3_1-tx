@@ -13,6 +13,7 @@
 
 
 void i2c_tx_packet_print(const I2C_TX_Packet* packet) {
+#if 0
     printf("\r\nI2C TX PACKET\r\n\r\n");
     printf("Packet Length: 0x%02X\r\n", packet->pkt_len);
     printf("ID: 0x%04X\r\n", packet->id);
@@ -25,11 +26,12 @@ void i2c_tx_packet_print(const I2C_TX_Packet* packet) {
     }
     printf("\r\nCRC: 0x%04X\r\n", packet->crc);
     printf("Packet Length: %d\r\n\r\n", packet->data_len + 8);
-
+#endif
 }
 
 void i2c_status_packet_print(const I2C_STATUS_Packet* packet)
 {
+#if 0
     printf("\r\nI2C STATUS PACKET\r\n\r\n");
     printf("ID: 0x%04X\r\n", packet->id);
     printf("Command (cmd): 0x%02X\r\n", packet->cmd);
@@ -38,7 +40,7 @@ void i2c_status_packet_print(const I2C_STATUS_Packet* packet)
     printf("Data Length: %d\r\n", packet->data_len);
     printf("\r\nCRC: 0x%04X\r\n", packet->crc);
     printf("Packet Length: %d\r\n\r\n", (int)sizeof(I2C_STATUS_Packet));
-
+#endif
 }
 
 bool i2c_packet_fromBuffer(const uint8_t* buffer, I2C_TX_Packet* pTX) {

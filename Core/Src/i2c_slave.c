@@ -85,9 +85,10 @@ void i2c_print_info() {
 
     // Calculate the I2C speed in Hz
     //uint32_t i2c_speed = pclk / ((timing & 0xFFFF) + 1);
-
+#if 0
     printf("I2C Speed: %d kHz\r\n", 400); // Print the I2C speed in kHz
     printf("I2C Slave Addr: 0x%02x\r\n\r\n", (uint8_t)(GLOBAL_I2C_DEVICE->Init.OwnAddress1 >> 1));
+#endif
 }
 
 

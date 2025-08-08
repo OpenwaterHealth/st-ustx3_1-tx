@@ -82,6 +82,8 @@ typedef enum {
 	OW_CTRL_STATUS_SWTRIG = 0x17,
 	OW_CTRL_SET_HV = 0x18,
 	OW_CTRL_GET_HV = 0x19,
+	OW_CTRL_SET_PROFILE = 0x1A,
+	OW_CTRL_GET_PROFILE = 0x1B,
 } UstxControllerCommands;
 
 typedef enum {
