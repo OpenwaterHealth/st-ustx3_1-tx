@@ -8,6 +8,8 @@
 #include "utils.h"
 #include <stdio.h>
 
+#include "debug.h"
+
 // CRC16-ccitt lookup table
 const uint16_t crc16_tab[256] = {
 	0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7,

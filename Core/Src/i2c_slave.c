@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "debug.h"
+
 uint8_t rx_buffer[I2C_BUFFER_SIZE];
 uint8_t tx_buffer[I2C_BUFFER_SIZE];
 uint8_t status_buffer[I2C_STATUS_SIZE];

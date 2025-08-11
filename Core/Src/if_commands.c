@@ -21,6 +21,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "debug.h"
+
 #define MAX_NUMBER_OF_PROFILES 16
 
 extern uint8_t FIRMWARE_VERSION_DATA[3];

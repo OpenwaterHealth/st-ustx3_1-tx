@@ -38,6 +38,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "debug.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/

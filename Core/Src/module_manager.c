@@ -1,5 +1,6 @@
 #include "module_manager.h"
 #include <stdio.h>
+#include "debug.h"
 
 // Internal storage for module information.
 static ModuleInfo modules[MAX_MODULES];

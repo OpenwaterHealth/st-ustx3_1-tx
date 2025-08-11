@@ -6,6 +6,7 @@
  */
 
 #include "main.h"
+#include "debug.h"
 #include "i2c_protocol.h"
 #include "i2c_master.h"
 #include <stdio.h>

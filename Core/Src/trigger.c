@@ -3,12 +3,14 @@
 #include "main.h"
 #include "thermistor.h"
 
- #include "jsmn.h"
+#include "jsmn.h"
 
- #include <stdio.h>
- #include <string.h>
- #include <stdbool.h>
- #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+#include <stdlib.h>
+
+#include "debug.h"
 
 // Internal state variables
 static volatile uint32_t _pulseCount = 0;

@@ -11,9 +11,10 @@
 #include "utils.h"
 #include <stdio.h>
 
+#include "debug.h"
 
 void i2c_tx_packet_print(const I2C_TX_Packet* packet) {
-#if 0
+#if 1
     printf("\r\nI2C TX PACKET\r\n\r\n");
     printf("Packet Length: 0x%02X\r\n", packet->pkt_len);
     printf("ID: 0x%04X\r\n", packet->id);
@@ -31,7 +32,7 @@ void i2c_tx_packet_print(const I2C_TX_Packet* packet) {
 
 void i2c_status_packet_print(const I2C_STATUS_Packet* packet)
 {
-#if 0
+#if 1
     printf("\r\nI2C STATUS PACKET\r\n\r\n");
     printf("ID: 0x%04X\r\n", packet->id);
     printf("Command (cmd): 0x%02X\r\n", packet->cmd);
