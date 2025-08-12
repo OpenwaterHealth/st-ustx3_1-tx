@@ -735,6 +735,7 @@ void pulsetrain_complete_callback(uint32_t curr_count, uint32_t total_count) {
 	if(async_enabled){
 		int tx_temp_int = (int)(tx_temperature * 10);  // e.g. 32.6 → 326
 		int amb_temp_int = (int)(ambient_temperature * 10);  // e.g. 32.6 → 326
+
         // Format full status string
         int len = snprintf((char*)owDataBuffer, sizeof(owDataBuffer),
             "STATUS:RUNNING,"
