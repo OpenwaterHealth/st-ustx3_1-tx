@@ -408,7 +408,7 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->data_len = 1;
 
 			// &transmitters[cmd->addr];
-			uint16_t profile = TX7332_ReadReg(&transmitters[cmd->addr], PROFILE_SELECT_REGISTER);
+			uint32_t profile = TX7332_ReadReg(&transmitters[cmd->addr], PROFILE_SELECT_REGISTER);
 			// uint8_t  bit_index = 0;
 			
 			// if (profile != 0) {
