@@ -395,7 +395,11 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->data_len = 0;
 
 			uint8_t value = cmd->data[0];
-			//TODO: check if value is in range 0-31 
+			if (value >= MAX_NUMBER_OF_PROFILES)
+			{
+				uartResp->packet_type = OW_ERROR;
+				return;
+			}
 
 			TX7332_WriteReg(&transmitters[cmd->addr], PROFILE_SELECT_REGISTER, 0x0000);
 			TX7332_WriteReg(&transmitters[cmd->addr], PROFILE_SELECT_REGISTER, value);
@@ -407,18 +411,7 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = 1;
 
-			// &transmitters[cmd->addr];
 			uint32_t profile = TX7332_ReadReg(&transmitters[cmd->addr], PROFILE_SELECT_REGISTER);
-			// uint8_t  bit_index = 0;
-			
-			// if (profile != 0) {
-			// 	for (uint8_t i = 0; i < 16; i++) {
-			// 		if (profile & (1 << i)) {
-			// 			bit_index = i;
-			// 			break;
-			// 		}
-			// 	}
-			// }
 			uartResp->data = (uint8_t *)&profile;
 			break;
 
