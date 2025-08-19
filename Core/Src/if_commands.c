@@ -24,6 +24,7 @@
 #include "debug.h"
 
 #define MAX_NUMBER_OF_PROFILES 16
+#define PROFILE_SELECT_REGISTER 0x1E
 
 extern uint8_t FIRMWARE_VERSION_DATA[3];
 extern bool _enter_dfu;
@@ -319,8 +320,8 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uint8_t value = cmd->data[0];
 			//TODO: check if value is in range 0-31 
 
-			TX7332_WriteReg(&transmitters[cmd->addr], 0x1E, 0x0000);
-			TX7332_WriteReg(&transmitters[cmd->addr], 0x1E, value);
+			TX7332_WriteReg(&transmitters[cmd->addr], PROFILE_SELECT_REGISTER, 0x0000);
+			TX7332_WriteReg(&transmitters[cmd->addr], PROFILE_SELECT_REGISTER, value);
 			break;
 
 		case OW_CTRL_GET_PROFILE:
@@ -330,7 +331,7 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->data_len = 1;
 
 			// &transmitters[cmd->addr];
-			uint16_t profile = TX7332_ReadReg(&transmitters[cmd->addr], 0x1E);
+			uint16_t profile = TX7332_ReadReg(&transmitters[cmd->addr], PROFILE_SELECT_REGISTER);
 			// uint8_t  bit_index = 0;
 			
 			// if (profile != 0) {
