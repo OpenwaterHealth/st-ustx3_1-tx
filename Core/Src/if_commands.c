@@ -37,7 +37,7 @@ static uint32_t id_words[3] = {0};
 static char retTriggerJson[0xFF];
 
 uint8_t send_buff[I2C_BUFFER_SIZE] = {0};
-uint8_t receive_status[I2C_STATUS_SIZE] = {0};
+uint8_t receive_buffer[I2C_BUFFER_SIZE] = {0};
 
 typedef struct {
 	uint8_t profile;
@@ -48,7 +48,7 @@ PulseProfile pulse_profiles[MAX_NUMBER_OF_PROFILES] = {0};
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
-static void process_i2c_read_status(UartPacket *uartResp, UartPacket* cmd, uint8_t module_id);
+static void process_i2c_read_buffer(UartPacket *uartResp, UartPacket* cmd, uint8_t module_id);
 static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t module_id);
 
 static void print_uart_packet(const UartPacket* packet) {
@@ -67,12 +67,13 @@ static void print_uart_packet(const UartPacket* packet) {
 }
 
 
-static void process_i2c_read_status(UartPacket *uartResp, UartPacket* cmd, uint8_t module_id)
+static void process_i2c_read_buffer(UartPacket *uartResp, UartPacket* cmd, uint8_t module_id)
 {
 	uint16_t rx_len = 0;
 	uint8_t slave_addr = ModuleManager_GetModule(module_id)->i2c_address;
-	I2C_STATUS_Packet ret_i2c_status;
+	I2C_TX_Packet ret_i2c_packet;
 
+	memset(receive_buffer, 0, I2C_BUFFER_SIZE);
 	if(module_id == 0){
 		printf("No Module found\r\n");
 		uartResp->id = cmd->id;
@@ -83,16 +84,27 @@ static void process_i2c_read_status(UartPacket *uartResp, UartPacket* cmd, uint8
 		return;
 	}else{
 		uartResp->id = cmd->id;
-		uartResp->packet_type = OW_ERROR;
+		uartResp->packet_type = cmd->packet_type;
 		uartResp->command = cmd->command;
-		uartResp->data_len = 0;
-		uartResp->data = NULL;
+		if (cmd->packet_type == OW_TX7332){
+			if (cmd->command == OW_TX7332_RREG) {
+				uartResp->data_len = 4;
+			} else {
+				uartResp->data_len = 0;
+			}
+		} else {
+			uartResp->data_len = cmd->data_len;
+		}
 	}
 
-	rx_len = read_status_register_of_slave_global(slave_addr, receive_status, I2C_STATUS_SIZE);
+	rx_len = read_buffer_of_slave_global(slave_addr, receive_buffer, uartResp->data_len);
 	printf("Received %d Bytes \r\n", rx_len);
-	if(i2c_status_packet_fromBuffer(receive_status, &ret_i2c_status)){
-		if(ret_i2c_status.status == 0) uartResp->packet_type = OW_RESP;
+	if(i2c_packet_fromBuffer(receive_buffer, &ret_i2c_packet)){
+		uartResp->packet_type = ret_i2c_packet.reserved;
+		uartResp->data_len = ret_i2c_packet.data_len;
+		uartResp->data = (uint8_t *)ret_i2c_packet.pData;
+	} else {
+		uartResp->packet_type = OW_ERROR;
 	}
 }
 
@@ -105,10 +117,11 @@ static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t m
 
 	if(module_id == 0){
 		uartResp->id = cmd->id;
-		uartResp->packet_type = OW_ERROR;
 		uartResp->command = cmd->command;
 		return;
 	}
+
+	memset(send_buff, 0, I2C_BUFFER_SIZE);
 
 	slave_addr = ModuleManager_GetModule(module_id)->i2c_address;
 	local_tx_idx = cmd->addr - (module_id * TX_PER_MODULE);
@@ -124,14 +137,13 @@ static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t m
 		send_i2c_packet.data_len = cmd->data_len;
 		send_i2c_packet.pData = cmd->data;
 
-	    // i2c_tx_packet_print(&send_i2c_packet);
-
 		send_len = i2c_packet_toBuffer(&send_i2c_packet, send_buff);  // rebuild buffer
+
 		if(send_buffer_to_slave_global(slave_addr, send_buff, send_len) != 0) { // send buffer to slave
 			uartResp->packet_type = OW_ERROR;
 		}else{
 			HAL_Delay(250);
-			process_i2c_read_status(uartResp, cmd, module_id);
+			process_i2c_read_buffer(uartResp, cmd, module_id);
 		}
 	}
 
@@ -139,6 +151,8 @@ static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t m
 
 static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 {
+	uint8_t module_id = 0;
+
 	switch (cmd->command)
 	{
 		case OW_CMD_PING:
@@ -183,14 +197,13 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			uartResp->data = (uint8_t *)&id_words;
 			break;
 		case OW_CMD_GET_TEMP:
-			tx_temperature = 32.5;
 			uartResp->id = cmd->id;
 			uartResp->command = cmd->command;
 			uartResp->data_len = 4;
 			uartResp->data = (uint8_t *)&tx_temperature;
 			break;
 		case OW_CMD_GET_AMBIENT:
-			ambient_temperature = 30.02;
+			ambient_temperature = 0;
 			uartResp->id = cmd->id;
 			uartResp->command = cmd->command;
 			uartResp->data_len = 4;
@@ -217,10 +230,34 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			set_slave_address(cmd->addr);
 			break;
 		case OW_CMD_RESET:
-			uartResp->command = cmd->command;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
-			uartResp->data_len = 0;
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			if (module_id == 0x00){
+				uartResp->command = cmd->command;
+				uartResp->addr = cmd->addr;
+				uartResp->reserved = cmd->reserved;
+				uartResp->data_len = 0;
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
+			break;
+		case OW_CMD_DFU:
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			if (module_id == 0x00){
+				uartResp->command = cmd->command;
+				uartResp->addr = cmd->addr;
+				uartResp->reserved = cmd->reserved;
+				uartResp->data_len = 0;
+
+				_enter_dfu = true;
+
+				__HAL_TIM_CLEAR_FLAG(&htim17, TIM_FLAG_UPDATE);
+				__HAL_TIM_SET_COUNTER(&htim17, 0);
+				if(HAL_TIM_Base_Start_IT(&htim17) != HAL_OK){
+					uartResp->packet_type = OW_ERROR;
+				}
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
 			break;
 		default:
 			uartResp->addr = 0;
@@ -234,12 +271,19 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 
 static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 {
+	uint8_t module_id = 0;
+
 	switch (cmd->command)
 	{
 		case OW_CMD_PING:
-			uartResp->command = cmd->command;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			if (module_id == 0x00){
+				uartResp->command = cmd->command;
+				uartResp->addr = cmd->addr;
+				uartResp->reserved = cmd->reserved;
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
 			break;
 		case OW_CMD_PONG:
 			uartResp->command = cmd->command;
@@ -247,11 +291,17 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->reserved = cmd->reserved;
 			break;
 		case OW_CMD_VERSION:
-			uartResp->command = cmd->command;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
-			uartResp->data_len = sizeof(FIRMWARE_VERSION_DATA);
-			uartResp->data = FIRMWARE_VERSION_DATA;
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			cmd->data_len = sizeof(FIRMWARE_VERSION_DATA); //passing amount to read if forwarding to slave
+			if (module_id == 0x00){
+				uartResp->command = cmd->command;
+				uartResp->addr = cmd->addr;
+				uartResp->reserved = cmd->reserved;
+				uartResp->data_len = sizeof(FIRMWARE_VERSION_DATA);
+				uartResp->data = FIRMWARE_VERSION_DATA;
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
 			break;
 		case OW_CMD_ECHO:
 			// exact copy
@@ -263,33 +313,60 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->data = cmd->data;
 			break;
 		case OW_CMD_TOGGLE_LED:
-			uartResp->id = cmd->id;
-			uartResp->command = cmd->command;
-			HAL_GPIO_TogglePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin); //no led pins declared
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			if (module_id == 0x00)
+			{
+				uartResp->data_len = 0;
+				uartResp->id = cmd->id;
+				uartResp->command = cmd->command;
+				HAL_GPIO_TogglePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin); 
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
 			break;
 		case OW_CMD_HWID:
-			uartResp->command = OW_CMD_HWID;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
-			id_words[0] = HAL_GetUIDw0();
-			id_words[1] = HAL_GetUIDw1();
-			id_words[2] = HAL_GetUIDw2();
-			uartResp->data_len = 16;
-			uartResp->data = (uint8_t *)&id_words;
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			cmd->data_len = HW_ID_DATA_LENGTH; //passing amount to read if forwarding to slave
+			if (module_id == 0x00)
+			{
+				uartResp->id = cmd->id;
+				uartResp->command = cmd->command;
+				uartResp->reserved = cmd->reserved;
+				uartResp->addr = cmd->addr;
+				id_words[0] = HAL_GetUIDw0();
+				id_words[1] = HAL_GetUIDw1();
+				id_words[2] = HAL_GetUIDw2();
+				uartResp->data_len = HW_ID_DATA_LENGTH;
+				uartResp->data = (uint8_t *)&id_words;
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
 			break;
 		case OW_CMD_GET_TEMP:
-			tx_temperature = Thermistor_ReadTemperature();
-			uartResp->id = cmd->id;
-			uartResp->command = cmd->command;
-			uartResp->data_len = 4;
-			uartResp->data = (uint8_t *)&tx_temperature;
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			cmd->data_len = TEMPERATURE_DATA_LENGTH; //passing amount to read if forwarding to slave
+			if (module_id == 0){
+				uartResp->id = cmd->id;
+				uartResp->command = cmd->command;
+				uartResp->data_len = TEMPERATURE_DATA_LENGTH;
+				tx_temperature = Thermistor_ReadTemperature();
+				uartResp->data = (uint8_t *)&tx_temperature;
+			}else{
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
 			break;
 		case OW_CMD_GET_AMBIENT:
-			ambient_temperature = MAX31875_ReadTemperature();
-			uartResp->id = cmd->id;
-			uartResp->command = cmd->command;
-			uartResp->data_len = 4;
-			uartResp->data = (uint8_t *)&ambient_temperature;
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			cmd->data_len = TEMPERATURE_DATA_LENGTH; //passing amount to read if forwarding to slave
+			if (module_id == 0){
+				ambient_temperature = MAX31875_ReadTemperature();
+				uartResp->id = cmd->id;
+				uartResp->command = cmd->command;
+				uartResp->data_len = TEMPERATURE_DATA_LENGTH;
+				uartResp->data = (uint8_t *)&ambient_temperature;
+			}else{
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
 			break;
 		case OW_CTRL_START_SWTRIG:
 			uartResp->command = cmd->command;
@@ -381,29 +458,39 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->data = (uint8_t *)retTriggerJson;
 			break;
 		case OW_CMD_RESET:
-			uartResp->command = cmd->command;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
-			uartResp->data_len = 0;
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			if (module_id == 0x00){
+				uartResp->command = cmd->command;
+				uartResp->addr = cmd->addr;
+				uartResp->reserved = cmd->reserved;
+				uartResp->data_len = 0;
 
-			__HAL_TIM_CLEAR_FLAG(&htim17, TIM_FLAG_UPDATE);
-			__HAL_TIM_SET_COUNTER(&htim17, 0);
-			if(HAL_TIM_Base_Start_IT(&htim17) != HAL_OK){
-				uartResp->packet_type = OW_ERROR;
+				__HAL_TIM_CLEAR_FLAG(&htim17, TIM_FLAG_UPDATE);
+				__HAL_TIM_SET_COUNTER(&htim17, 0);
+				if(HAL_TIM_Base_Start_IT(&htim17) != HAL_OK){
+					uartResp->packet_type = OW_ERROR;
+				}
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
 			}
 			break;
 		case OW_CMD_DFU:
-			uartResp->command = cmd->command;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
-			uartResp->data_len = 0;
+			module_id = ModuleManager_GetModuleIndex(cmd->addr);
+			if (module_id == 0x00){
+				uartResp->command = cmd->command;
+				uartResp->addr = cmd->addr;
+				uartResp->reserved = cmd->reserved;
+				uartResp->data_len = 0;
 
-			_enter_dfu = true;
+				_enter_dfu = true;
 
-			__HAL_TIM_CLEAR_FLAG(&htim17, TIM_FLAG_UPDATE);
-			__HAL_TIM_SET_COUNTER(&htim17, 0);
-			if(HAL_TIM_Base_Start_IT(&htim17) != HAL_OK){
-				uartResp->packet_type = OW_ERROR;
+				__HAL_TIM_CLEAR_FLAG(&htim17, TIM_FLAG_UPDATE);
+				__HAL_TIM_SET_COUNTER(&htim17, 0);
+				if(HAL_TIM_Base_Start_IT(&htim17) != HAL_OK){
+					uartResp->packet_type = OW_ERROR;
+				}
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
 			}
 			break;
 		case OW_CMD_ASYNC:
