@@ -153,10 +153,13 @@ bool TX7332_WriteBulkVerify(TX7332* device, uint16_t addr, uint32_t* be_bytes, i
 
     // Verify each written value
     for (int i = 0; i < len; ++i) {
-        uint32_t expectedValue = SE(be_bytes[i]); // Convert to the expected format
+        uint32_t expectedValue = *(be_bytes + i);
         uint32_t readValue = TX7332_ReadReg(device, addr + i);
-
-        if (readValue != expectedValue) {
+        if (addr == 0x18)
+        {
+        	readValue &= 0x0FFFFFFF; // Datasheet specifies to ignore leading byte during read for this register
+        }
+        if (expectedValue != readValue) {
             // Optional: Print a message if a mismatch occurs
             // printf("WriteVerify Error at %X: Expected %lX, Read %lX\n", addr + i, expectedValue, readValue);
             return false; // Return false if any value does not match
