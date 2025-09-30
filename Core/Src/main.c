@@ -254,11 +254,15 @@ void ConfigureHIzPin(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin)
 
 static bool ConfigureClock()
 {
+  int count = 0;
+  uint16_t v = 0;
 
+  // reset
+  HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_RESET);
+  HAL_Delay(250);
+  HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
   HAL_Delay(25);
-  I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1000);
-  HAL_Delay(25);
-  I2C_write_CDCE6214_reg(0x67, 0x000F, 0x5020);
+  //I2C_write_CDCE6214_reg(0x67, 0x000F, 0x5020); // unlock eeprom
   HAL_Delay(25);
 
   // printf("Configuring Clock chip\r\n");
@@ -283,17 +287,22 @@ static bool ConfigureClock()
     }
     HAL_Delay(1);
   }
-  HAL_Delay(50);
-  I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1110);
-  HAL_Delay(50);
-  I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1100);
-  HAL_Delay(10);
-  I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1000);
-  HAL_Delay(10);
+
+  I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1510); // calibrate
+  HAL_Delay(1);
+  I2C_write_CDCE6214_reg(0x67, 0x0000, 0x1500); // calibrate
+
+  for(count = 0; count < 10; count ++){   // check for lock
+	  HAL_Delay(50);
+	  v = I2C_read_CDCE6214_reg(0x67, 0x0007);
+	  if ((v & 0x01) == 0x01) {
+		  HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
+		  break;
+	  }
+  }
 
   return true;
 }
-
 
 static void Detect_MAX31875_Bus(void)
 {
@@ -421,7 +430,7 @@ int main(void)
   HAL_Delay(50);
 
   // system entering ready state
-  HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
+  // HAL_GPIO_WritePin(SYSTEM_RDY_GPIO_Port, SYSTEM_RDY_Pin, GPIO_PIN_RESET);
 
 
   HAL_Delay(250);
@@ -462,6 +471,7 @@ int main(void)
 
 		  // clock chip setup
 		  HAL_GPIO_WritePin(PDN_GPIO_Port, PDN_Pin, GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(REFSEL_GPIO_Port, REFSEL_Pin, GPIO_PIN_SET);
 		  HAL_Delay(10);
 		  ConfigureClock();
 
