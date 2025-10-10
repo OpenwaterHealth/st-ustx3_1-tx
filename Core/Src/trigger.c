@@ -381,7 +381,7 @@ uint8_t start_trigger_pulse(void) {
 
     // Validate: Pulse train interval must be 0 or greater than the period
     if (_timerDataConfig.TriggerPulseTrainInterval > 0 &&
-        _timerDataConfig.TriggerPulseTrainInterval <= triggerPeriodUsec) {
+        _timerDataConfig.TriggerPulseTrainInterval <= (triggerPeriodUsec * _timerDataConfig.TriggerPulseTrainCount)) {
         _timerDataConfig.TriggerStatus = TRIGGER_STATUS_ERROR;
         return TRIGGER_STATUS_ERROR;
     }
@@ -413,6 +413,12 @@ uint8_t start_trigger_pulse(void) {
     HAL_TIM_PWM_Start(&TRIGGER_TIMER, TIM_CHANNEL_2);
     HAL_TIM_Base_Start_IT(&LORES_TIMER);
 	HAL_TIM_Base_Start_IT(&TEMPERATURE_TIMER);
+	if(_timerDataConfig.TriggerPulseTrainInterval>0) {
+		// Re-enable interrupts
+		__HAL_TIM_ENABLE_IT(&HIRES_TIMER, TIM_IT_UPDATE);
+		// Start PWM
+		HAL_TIM_Base_Start_IT(&HIRES_TIMER);
+	}
     _timerDataConfig.TriggerStatus = TRIGGER_STATUS_RUNNING;
     return TRIGGER_STATUS_RUNNING;
 }
@@ -450,6 +456,12 @@ void TRIG_TIM2_IRQHandler(void) {
 	    HAL_TIM_PWM_Start(&TRIGGER_TIMER, TIM_CHANNEL_2);
 	    __HAL_TIM_ENABLE_IT(&LORES_TIMER, TIM_IT_UPDATE);
 	    HAL_TIM_Base_Start_IT(&LORES_TIMER);
+		if(_timerDataConfig.TriggerPulseTrainInterval>0) {
+			// Re-enable interrupts
+			__HAL_TIM_ENABLE_IT(&HIRES_TIMER, TIM_IT_UPDATE);
+			// Start PWM
+			HAL_TIM_Base_Start_IT(&HIRES_TIMER);
+		}
 	}
 }
 
@@ -466,14 +478,7 @@ void TRIG_TIM3_IRQHandler(void) {
 
         __HAL_TIM_DISABLE_IT(&LORES_TIMER, TIM_IT_UPDATE);
         HAL_TIM_Base_Stop_IT(&LORES_TIMER);
-        if(_timerDataConfig.TriggerPulseTrainInterval>0) {
-
-            // Re-enable interrupts
-            __HAL_TIM_ENABLE_IT(&HIRES_TIMER, TIM_IT_UPDATE);
-
-            // Start PWM
-            HAL_TIM_Base_Start_IT(&HIRES_TIMER);
-        }else{
+        if(_timerDataConfig.TriggerPulseTrainInterval==0) {
 			_trainCount++;
         	if(_timerDataConfig.TriggerMode == TRIGGER_MODE_SINGLE)
         	{
