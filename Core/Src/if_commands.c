@@ -671,6 +671,14 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			process_i2c_forward(uartResp, cmd, module_id);
 		}
 		break;
+	case OW_TX7332_DEVICE_COUNT:
+		uint8_t temp_module_count = get_module_count();
+		uartResp->command = OW_TX7332_DEVICE_COUNT;
+		uartResp->addr = 0;
+		uartResp->reserved = 0;
+		uartResp->data = &temp_module_count;
+		uartResp->data_len = 1;
+		break;
 	case OW_TX7332_RESET:
 		uartResp->command = OW_TX7332_RESET;
 		uartResp->addr = 0;
