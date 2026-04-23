@@ -65,8 +65,8 @@
  #define ADDR_FLASH_PAGE_50    ((uint32_t)0x08019000) /* Base @ of Page 50, 2 Kbytes */
  #define ADDR_FLASH_PAGE_51    ((uint32_t)0x08019800) /* Base @ of Page 51, 2 Kbytes */
  #define ADDR_FLASH_PAGE_52    ((uint32_t)0x0801A000) /* Base @ of Page 52, 2 Kbytes */
- #define ADDR_FLASH_PAGE_53    ((uint32_t)0x0801A800) /* Base @ of Page 53, 2 Kbytes  */
- #define ADDR_FLASH_PAGE_54    ((uint32_t)0x0801B000) /* Base @ of Page 54, 2 Kbytes  */
+ #define ADDR_FLASH_PAGE_53    ((uint32_t)0x0801A800) /* Base @ of Page 53, 2 Kbytes */
+ #define ADDR_FLASH_PAGE_54    ((uint32_t)0x0801B000) /* Base @ of Page 54, 2 Kbytes */
  #define ADDR_FLASH_PAGE_55    ((uint32_t)0x0801B800) /* Base @ of Page 55, 2 Kbytes */
  #define ADDR_FLASH_PAGE_56    ((uint32_t)0x0801C000) /* Base @ of Page 56, 2 Kbytes */
  #define ADDR_FLASH_PAGE_57    ((uint32_t)0x0801C800) /* Base @ of Page 57, 2 Kbytes */
@@ -76,25 +76,12 @@
  #define ADDR_FLASH_PAGE_61    ((uint32_t)0x0801E800) /* Base @ of Page 61, 2 Kbytes */
  #define ADDR_FLASH_PAGE_62    ((uint32_t)0x0801F000) /* Base @ of Page 62, 2 Kbytes */
  #define ADDR_FLASH_PAGE_63    ((uint32_t)0x0801F800) /* Base @ of Page 63, 2 Kbytes */
-
- /* proposed memory map 128 bytes 0-1023 indexes total 128KB Flash 6KB  EEPROM 20KB RAM
- 	INDEX_0 				Bootloader					0x08000000		64K
- 	INDEX_128 				Application					0x08010000		64K
- 	INDEX_640 				Application					0x08020000		64K
- 	EEPROM_1			    Config						0x08080000
- 	EEPROM_2			    Config						0x08080C00
- */
-
-#define EEPROM_SIZE             			((uint32_t)0xC00)    // in bytes
+ #define ADDR_FLASH_END_ADDRESS ((uint32_t)0x08020000) /* END OF FLASH */
 
 #define FLASH_START_ADDRESS        			((uint32_t)0x08000000)
-#define EEPROM_START_ADDRESS				((uint32_t)0x08080000)
-#define BOOTLOADER_ADDRESS        			((uint32_t)0x08000000)
-#define APPLICATION_ADDRESS        			((uint32_t)0x08010000)
-#define APPLICATION_ADDRESS2       			((uint32_t)0x08020000)
-
-#define SRAM_BASE_ADDRESS       			((uint32_t)0x20000000)
-#define SRAM_SIZE			       			((uint32_t)0x5000)
+#define APPLICATION_ADDRESS        			((uint32_t)0x08000000) // 190 KB application region after metadata
+#define APPLICATION_USER_CONFIG    			((uint32_t)0x0801F800) // 2 KB user config region (page 127, end of flash), application use only -- not writable via DFU
+#define APPLICATION_MAX_SIZE                ((uint32_t)(128U * 1024U))
 
 #ifdef __cplusplus
 }

@@ -8,14 +8,31 @@
 #ifndef INC_COMMON_H_
 #define INC_COMMON_H_
 
+#include "version.h"
+
 #include <stdint.h>
 
-#define COMMAND_MAX_SIZE 384
+#define COMMAND_MAX_SIZE 528
 #define ONEWIRE_MAX_SIZE 48
+#define DATA_MAX_SIZE 512
 
 // Configuration: each module has two transmitters; adjust as necessary.
 #define TX_PER_MODULE 2
 #define MAX_MODULES   6  // Total number of modules (master + slaves)
+
+#ifndef FW_VERSION
+#define FW_VERSION "unknown"
+#endif
+#ifndef FW_SHA
+#define FW_SHA "unknown"
+#endif
+#ifndef FW_BUILD_TIME
+#define FW_BUILD_TIME "unknown"
+#endif
+
+#define FW_VERSION_STRING FW_VERSION
+#define FW_SHA_STRING FW_SHA
+#define FW_BUILD_TIME_STRING FW_BUILD_TIME
 
 
 typedef enum {
@@ -65,6 +82,7 @@ typedef enum {
 	OW_CMD_GET_TEMP = 0x06,
 	OW_CMD_GET_AMBIENT = 0x07,
 	OW_CMD_ASYNC = 0x09,
+	OW_CMD_USR_CFG = 0x0A,
 	OW_CMD_DISCOVERY = 0x0C,
 	OW_CMD_DFU = 0x0D,
 	OW_CMD_NOP = 0x0E,
@@ -82,6 +100,7 @@ typedef enum {
 	OW_CTRL_STATUS_SWTRIG = 0x17,
 	OW_CTRL_SET_HV = 0x18,
 	OW_CTRL_GET_HV = 0x19,
+	OW_CTRL_GET_MODULE_COUNT = 0x1A,
 } UstxControllerCommands;
 
 typedef enum {
@@ -92,6 +111,7 @@ typedef enum {
 	OW_TX7332_WBLOCK = 0x24,
 	OW_TX7332_VWREG = 0x25,
 	OW_TX7332_VWBLOCK = 0x26,
+	OW_TX7332_RBLOCK = 0x27,
 	OW_TX7332_DEVICE_COUNT = 0x2C,
 	OW_TX7332_DEMO = 0x2D,
 	OW_TX7332_RESET = 0x2F,

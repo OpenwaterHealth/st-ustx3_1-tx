@@ -15,6 +15,7 @@
 
 //#define MAX_FOUND_ADDRESSES 5
 
+#define COMMS_TIMEOUT 250
 
 uint8_t selected_slave = 0xFF;
 uint8_t found_address_count = 0;
@@ -76,7 +77,7 @@ uint8_t send_buffer_to_slave_local(uint8_t slave_addr, uint8_t* pBuffer, uint16_
     }
 
 	// printf("===> Sending Packet %d Bytes\r\n", buf_len);
-    if(HAL_I2C_Master_Transmit(LOCAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), pBuffer, buf_len, HAL_MAX_DELAY)!= HAL_OK)
+    if(HAL_I2C_Master_Transmit(LOCAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), pBuffer, buf_len, COMMS_TIMEOUT)!= HAL_OK)
 	{
         /* Error_Handler() function is called when error occurs. */
         Error_Handler();
@@ -107,37 +108,69 @@ uint8_t send_buffer_to_slave_global(uint8_t slave_addr, uint8_t* pBuffer, uint16
 	return 0;
 }
 
-uint8_t read_buffer_of_slave_global(uint8_t slave_addr, uint8_t* pBuffer, uint16_t max_len)
+uint16_t read_buffer_of_slave_global(uint8_t slave_addr, uint8_t* pBuffer, uint16_t max_len)
 {
-    uint8_t rx_len = max_len + HEADER_SIZE;
-    
-	// Check if the I2C handle is valid
+    /* Phase 1: read the 2-byte pkt_len field to find the exact packet size.
+     * This prevents the master from requesting more bytes than the slave has
+     * prepared, which would block until timeout on variable-length responses
+     * such as OW_CMD_USR_CFG. */
     if (HAL_I2C_GetState(GLOBAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
-    	printf("===> ERROR I2C Not in ready state\r\n");
-        return 1; // I2C is not in a ready state
+    	printf("===> ERROR I2C Not in ready state (phase 1)\r\n");
+        return 0;
     }
 
-	// printf("===> Receive Status Packet %d Bytes\r\n", rx_len);
-
-#if 0
-
-	if(HAL_I2C_Master_Receive(GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
-	{
-        /* Error_Handler() function is called when error occurs. */
-        Error_Handler();
-	}
-
-#else
-
-    if(HAL_I2C_Mem_Read(GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), 0x00, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
-    {
-        /* Error_Handler() function is called when error occurs. */
-        Error_Handler();
+    uint8_t len_bytes[2] = {0};
+    if (HAL_I2C_Mem_Read(GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1),
+                          0x00, I2C_MEMADD_SIZE_8BIT,
+                          len_bytes, 2, 500) != HAL_OK) {
+        return 0;
     }
 
-#endif
+    uint16_t pkt_len = (uint16_t)(len_bytes[0] | ((uint16_t)len_bytes[1] << 8));
+    if (pkt_len < HEADER_SIZE || pkt_len > I2C_BUFFER_SIZE) {
+        printf("===> ERROR invalid pkt_len %d from slave\r\n", pkt_len);
+        return 0;
+    }
 
-	return rx_len;
+    /* Phase 2: read the full packet now that we know its exact size. */
+    if (HAL_I2C_GetState(GLOBAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
+    	printf("===> ERROR I2C Not in ready state (phase 2)\r\n");
+        return 0;
+    }
+
+    if (HAL_I2C_Mem_Read(GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1),
+                          0x00, I2C_MEMADD_SIZE_8BIT,
+                          pBuffer, pkt_len, COMMS_TIMEOUT) != HAL_OK) {
+        /* Do not call Error_Handler — a slave that just received a DFU or
+         * RESET command may have rebooted before we issue this read.
+         *
+         * However, returning 0 here can cause callers that blindly parse
+         * the buffer to underflow a length calculation (e.g., size =
+         * pkt_len - HEADER_SIZE when pkt_len == 0), leading to
+         * out-of-bounds reads. To mitigate this, if the provided buffer
+         * is large enough to hold a header, synthesize a minimal,
+         * self-consistent packet with a zero-length payload:
+         *   - pkt_len field set to HEADER_SIZE
+         *   - remaining header bytes cleared
+         * Callers that ignore errors will then see a valid header and a
+         * payload size of 0, avoiding underflow and hard faults.
+         */
+        if (max_len >= HEADER_SIZE) {
+            /* Set pkt_len in little-endian form. */
+            pBuffer[0] = (uint8_t)(HEADER_SIZE & 0xFFu);
+            pBuffer[1] = (uint8_t)((HEADER_SIZE >> 8) & 0xFFu);
+            /* Clear the rest of the header (if any). */
+            if (HEADER_SIZE > 2u) {
+                memset(&pBuffer[2], 0, (size_t)(HEADER_SIZE - 2u));
+            }
+            return HEADER_SIZE;
+        }
+
+        /* Buffer not large enough to hold even a header; signal failure. */
+        return 0;
+    }
+
+    return pkt_len;
 }
 
 uint8_t read_data_register_of_slave_local(uint8_t slave_addr, uint8_t* pBuffer, size_t rx_len)
@@ -150,7 +183,7 @@ uint8_t read_data_register_of_slave_local(uint8_t slave_addr, uint8_t* pBuffer, 
 
 	// printf("===> Receive Data Packet %d Bytes\r\n", rx_len);
 
-    if(HAL_I2C_Mem_Read(LOCAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), 0x01, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
+    if(HAL_I2C_Mem_Read(LOCAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), 0x01, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, COMMS_TIMEOUT)!= HAL_OK)
     {
         /* Error_Handler() function is called when error occurs. */
         Error_Handler();
@@ -169,13 +202,30 @@ uint8_t read_data_register_of_slave_global(uint8_t slave_addr, uint8_t* pBuffer,
 
 	// printf("===> Receive Data Packet %d Bytes\r\n", rx_len);
 
-    if(HAL_I2C_Mem_Read(GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), 0x01, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, HAL_MAX_DELAY)!= HAL_OK)
+    if(HAL_I2C_Mem_Read(GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1), 0x01, I2C_MEMADD_SIZE_8BIT, pBuffer, rx_len, COMMS_TIMEOUT)!= HAL_OK)
     {
         /* Error_Handler() function is called when error occurs. */
         Error_Handler();
     }
 
 	return rx_len;
+}
+
+uint8_t read_raw_from_slave_global(uint8_t slave_addr, uint8_t* pBuffer, size_t rx_len)
+{
+    /* Plain I2C read — no register address prefix. Used for the DFU bootloader
+     * at address 0x72, which expects raw HAL_I2C_Master_Receive reads. */
+    if (HAL_I2C_GetState(GLOBAL_I2C_DEVICE) != HAL_I2C_STATE_READY) {
+        printf("===> ERROR I2C Not in ready state (raw read)\r\n");
+        return 1;
+    }
+
+    if (HAL_I2C_Master_Receive(GLOBAL_I2C_DEVICE, (uint16_t)(slave_addr << 1),
+                                pBuffer, (uint16_t)rx_len, COMMS_TIMEOUT) != HAL_OK) {
+        return 2;
+    }
+
+    return 0;
 }
 
 uint16_t I2C_read_CDCE6214_reg(uint8_t i2c_addr, uint16_t reg_addr)
@@ -191,14 +241,14 @@ uint16_t I2C_read_CDCE6214_reg(uint8_t i2c_addr, uint16_t reg_addr)
     uint8_t data_to_receive[2];
 
     // Start I2C communication
-    status = HAL_I2C_Master_Transmit(LOCAL_I2C_DEVICE, i2c_addr << 1, data_to_send, 2, HAL_MAX_DELAY);
+    status = HAL_I2C_Master_Transmit(LOCAL_I2C_DEVICE, i2c_addr << 1, data_to_send, 2, COMMS_TIMEOUT);
     if (status != HAL_OK) {
         // Handle error
         return 0xFFFF; // Return an error value
     }
 
     // Receive the data from the CDCE6214 chip
-    status = HAL_I2C_Master_Receive(LOCAL_I2C_DEVICE, i2c_addr << 1, data_to_receive, 2, HAL_MAX_DELAY);
+    status = HAL_I2C_Master_Receive(LOCAL_I2C_DEVICE, i2c_addr << 1, data_to_receive, 2, COMMS_TIMEOUT);
     if (status != HAL_OK) {
         // Handle error
         return 0xFFFF; // Return an error value
@@ -223,7 +273,7 @@ bool I2C_write_CDCE6214_reg(uint8_t i2c_addr, uint16_t reg_addr, uint16_t reg_va
     data_to_send[3] = (uint8_t)(reg_val & 0xFF); // Data low byte
 
     // Start I2C communication and send the data
-    status = HAL_I2C_Master_Transmit(LOCAL_I2C_DEVICE, i2c_addr << 1, data_to_send, 4, HAL_MAX_DELAY);
+    status = HAL_I2C_Master_Transmit(LOCAL_I2C_DEVICE, i2c_addr << 1, data_to_send, 4, COMMS_TIMEOUT);
     if (status != HAL_OK) {
         // Handle error
         b_res = false;
@@ -239,10 +289,10 @@ float MAX31875_ReadTemperature(void) {
     float temperature;
 
     // Set pointer register to Temperature Register
-    HAL_I2C_Master_Transmit(LOCAL_I2C_DEVICE, MAX31875_ADDRESS << 1, &pointer_byte, 1, HAL_MAX_DELAY);
+    HAL_I2C_Master_Transmit(LOCAL_I2C_DEVICE, MAX31875_ADDRESS << 1, &pointer_byte, 1, COMMS_TIMEOUT);
 
     // Read temperature data
-    HAL_I2C_Master_Receive(LOCAL_I2C_DEVICE, MAX31875_ADDRESS << 1, temp_data, 2, HAL_MAX_DELAY);
+    HAL_I2C_Master_Receive(LOCAL_I2C_DEVICE, MAX31875_ADDRESS << 1, temp_data, 2, COMMS_TIMEOUT);
 
     // Convert raw data to temperature
     raw_temp = (temp_data[0] << 8) | temp_data[1];

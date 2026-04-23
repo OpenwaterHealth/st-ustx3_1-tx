@@ -14,22 +14,24 @@
 #include "i2c_protocol.h"
 #include "trigger.h"
 #include "tx7332.h"
-#include "demo.h"
 #include "thermistor.h"
+#include "lifu_config.h"
 
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 
-extern uint8_t FIRMWARE_VERSION_DATA[3];
-extern bool _enter_dfu;
+#define COMMS_TIMEOUT 250
 
-extern int tx_count;
+extern bool _enter_dfu;
+extern bool _force_stm32_dfu; // for testing purposes, forces to enter STM32 system bootloader instead of custom DFU mode
+
 extern TX7332 transmitters[2];
 extern bool async_enabled;
 
 static uint32_t id_words[3] = {0};
 static char retTriggerJson[0xFF];
+static uint8_t module_count = 0;
 
 uint8_t send_buff[I2C_BUFFER_SIZE] = {0};
 uint8_t receive_buffer[I2C_BUFFER_SIZE] = {0};
@@ -104,22 +106,46 @@ static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t m
 	if(module_id == 0){
 		uartResp->id = cmd->id;
 		uartResp->command = cmd->command;
+		uartResp->packet_type = OW_ERROR;
+		uartResp->data_len = 0;
+		uartResp->data = NULL;
 		return;
 	}
 
 	memset(send_buff, 0, I2C_BUFFER_SIZE);
 
 	slave_addr = ModuleManager_GetModule(module_id)->i2c_address;
-	local_tx_idx = cmd->addr - (module_id * TX_PER_MODULE);
 
-	if(local_tx_idx<0 || local_tx_idx>1){
+	/* For TX7332 commands cmd->addr is the global TX chip index, so we compute
+	 * the local chip index within the slave.  For all other packet types
+	 * (HWID, PING, VERSION, USR_CFG, etc.) cmd->addr is the module index and
+	 * local_tx_idx is unused / irrelevant on the slave, so default to 0. */
+	if (cmd->packet_type == OW_TX7332) {
+		local_tx_idx = cmd->addr - (module_id * TX_PER_MODULE);
+	} else {
+		local_tx_idx = 0;
+	}
+
+	if(cmd->packet_type == OW_TX7332 && (local_tx_idx<0 || local_tx_idx>1)){
 		uartResp->packet_type = OW_ERROR;
 		uartResp->command = cmd->command;
 	}else {
+		if(cmd->data_len > DATA_MAX_SIZE){
+			uartResp->packet_type = OW_ERROR;
+			uartResp->command = cmd->command;
+			uartResp->data_len = 0;
+			uartResp->data = NULL;
+			return;
+		}
 		// relay to one of the slaves
 		send_i2c_packet.id = cmd->id;
 		send_i2c_packet.cmd = cmd->command;
-		send_i2c_packet.reserved = (uint8_t)local_tx_idx;
+		/* For TX7332 packets the reserved field carries the local chip index.
+		 * For all other packet types (PING, VERSION, HWID, USR_CFG, etc.) pass
+		 * the original reserved value through so read/write mode is preserved. */
+		send_i2c_packet.reserved = (cmd->packet_type == OW_TX7332)
+		                           ? (uint8_t)local_tx_idx
+		                           : cmd->reserved;
 		send_i2c_packet.data_len = cmd->data_len;
 		send_i2c_packet.pData = cmd->data;
 
@@ -128,11 +154,27 @@ static void process_i2c_forward(UartPacket *uartResp, UartPacket* cmd, uint8_t m
 		if(send_buffer_to_slave_global(slave_addr, send_buff, send_len) != 0) { // send buffer to slave
 			uartResp->packet_type = OW_ERROR;
 		}else{
-			HAL_Delay(250);
-			process_i2c_read_buffer(uartResp, cmd, module_id);
+			/* DFU and soft-reset commands cause the slave to reboot immediately
+			 * after processing.  Attempting an I2C readback on a resetting slave
+			 * would block in HAL_I2C_Mem_Read (COMMS_TIMEOUT) then call
+			 * Error_Handler, disabling IRQs and spinning until the IWDG fires
+			 * (~3.4 s) — which reboots the master.  Skip the readback and return
+			 * success: the slave has already accepted the command. */
+			if (cmd->command == OW_CMD_DFU || cmd->command == OW_CMD_RESET) {
+				uartResp->command  = cmd->command;
+				uartResp->addr     = cmd->addr;
+				uartResp->reserved = cmd->reserved;
+				uartResp->data_len = 0;
+			} else {
+				/* USR_CFG write involves a flash erase+program cycle on the slave
+				 * which can take up to ~300 ms; give it enough time to finish. */
+				uint32_t wait_ms = (cmd->command == OW_CMD_USR_CFG && cmd->reserved == 1) ? 400U : 50U;
+				uint32_t _t0 = HAL_GetTick();
+				while ((HAL_GetTick() - _t0) < wait_ms) { /* wait for slave to process */ }
+				process_i2c_read_buffer(uartResp, cmd, module_id);
+			}
 		}
-	}
-
+	}	
 }
 
 static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
@@ -155,8 +197,8 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			uartResp->command = cmd->command;
 			uartResp->addr = cmd->addr;
 			uartResp->reserved = cmd->reserved;
-			uartResp->data_len = sizeof(FIRMWARE_VERSION_DATA);
-			uartResp->data = FIRMWARE_VERSION_DATA;
+            uartResp->data_len = strlen(FW_VERSION_STRING);
+            uartResp->data = (uint8_t*)FW_VERSION_STRING;
 			break;
 		case OW_CMD_ECHO:
 			// exact copy
@@ -179,7 +221,7 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			id_words[0] = HAL_GetUIDw0();
 			id_words[1] = HAL_GetUIDw1();
 			id_words[2] = HAL_GetUIDw2();
-			uartResp->data_len = 16;
+			uartResp->data_len = sizeof(id_words);
 			uartResp->data = (uint8_t *)&id_words;
 			break;
 		case OW_CMD_GET_TEMP:
@@ -189,7 +231,6 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			uartResp->data = (uint8_t *)&tx_temperature;
 			break;
 		case OW_CMD_GET_AMBIENT:
-			ambient_temperature = 0;
 			uartResp->id = cmd->id;
 			uartResp->command = cmd->command;
 			uartResp->data_len = 4;
@@ -214,22 +255,85 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 			set_configured(true);
 			set_module_ID(cmd->reserved);
 			set_slave_address(cmd->addr);
-			break;
+			break;		
+        case OW_CMD_USR_CFG:
+            // reserved == 0: READ
+            // reserved == 1: WRITE (cmd->data is JSON text)
+			uartResp->id = cmd->id;
+			uartResp->command = OW_CMD_USR_CFG;
+            if (cmd->reserved == 0) {
+                const uint8_t *wire_buf = NULL;
+                uint16_t wire_len = 0;
+                const uint16_t max_payload = (uint16_t)(DATA_MAX_SIZE); 
+                if (lifu_cfg_wire_read(&wire_buf, &wire_len, max_payload) != HAL_OK || wire_buf == NULL) {
+                    uartResp->packet_type = OW_ERROR;
+                    uartResp->data_len = 0;
+                    uartResp->data = NULL;
+                    break;
+                }
+
+                uartResp->data_len = wire_len;
+                uartResp->data = (uint8_t *)wire_buf;
+            }
+            else if (cmd->reserved == 1) {
+                if (cmd->data == NULL || cmd->data_len == 0) {
+                    uartResp->packet_type = OW_ERROR;
+                    uartResp->data_len = 0;
+                    uartResp->data = NULL;
+                    break;
+                }
+
+                if (lifu_cfg_wire_write(cmd->data, cmd->data_len) != HAL_OK) {
+                    uartResp->packet_type = OW_ERROR;
+                    uartResp->data_len = 0;
+                    uartResp->data = NULL;
+                    break;
+                }
+
+                // Return the updated header as an ACK payload.
+                const uint8_t *wire_buf = NULL;
+                uint16_t wire_len = 0;
+                const uint16_t max_payload = (uint16_t)(DATA_MAX_SIZE);
+                if (lifu_cfg_wire_read(&wire_buf, &wire_len, max_payload) != HAL_OK || wire_buf == NULL) {
+                    uartResp->packet_type = OW_ERROR;
+                    uartResp->data_len = 0;
+                    uartResp->data = NULL;
+                    break;
+                }
+                uartResp->data_len = (uint16_t)sizeof(lifu_cfg_wire_hdr_t);
+                uartResp->data = (uint8_t *)wire_buf;
+            }
+            else {
+                uartResp->packet_type = OW_ERROR;
+                uartResp->data_len = 0;
+                uartResp->data = NULL;
+            }
+            break;
 		case OW_CMD_RESET:
+			uartResp->id = cmd->id;
+			uartResp->command = OW_CMD_RESET;
 			module_id = ModuleManager_GetModuleIndex(cmd->addr);
 			if (module_id == 0x00){
-				uartResp->command = cmd->command;
 				uartResp->addr = cmd->addr;
 				uartResp->reserved = cmd->reserved;
 				uartResp->data_len = 0;
+
+
+				__HAL_TIM_CLEAR_FLAG(&htim17, TIM_FLAG_UPDATE);
+				__HAL_TIM_SET_COUNTER(&htim17, 0);
+				if(HAL_TIM_Base_Start_IT(&htim17) != HAL_OK){
+					uartResp->packet_type = OW_ERROR;
+				}
+
 			} else {
 				process_i2c_forward(uartResp, cmd, module_id);
 			}
 			break;
 		case OW_CMD_DFU:
+			uartResp->id = cmd->id;
+			uartResp->command = OW_CMD_DFU;
 			module_id = ModuleManager_GetModuleIndex(cmd->addr);
 			if (module_id == 0x00){
-				uartResp->command = cmd->command;
 				uartResp->addr = cmd->addr;
 				uartResp->reserved = cmd->reserved;
 				uartResp->data_len = 0;
@@ -258,11 +362,16 @@ static void ONE_WIRE_ProcessCommand(UartPacket *uartResp, UartPacket *cmd)
 static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 {
 	uint8_t module_id = 0;
+	if (cmd->addr >= get_module_count()) {
+		uartResp->packet_type = OW_ERROR;
+		return;
+	}else{
+		module_id = (uint8_t)cmd->addr;
+	}
 
 	switch (cmd->command)
 	{
 		case OW_CMD_PING:
-			module_id = ModuleManager_GetModuleIndex(cmd->addr);
 			if (module_id == 0x00){
 				uartResp->command = cmd->command;
 				uartResp->addr = cmd->addr;
@@ -271,35 +380,32 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 				process_i2c_forward(uartResp, cmd, module_id);
 			}
 			break;
-		case OW_CMD_PONG:
-			uartResp->command = cmd->command;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
-			break;
 		case OW_CMD_VERSION:
-			module_id = ModuleManager_GetModuleIndex(cmd->addr);
-			cmd->data_len = sizeof(FIRMWARE_VERSION_DATA); //passing amount to read if forwarding to slave
+			cmd->data_len = strlen(FW_VERSION_STRING); //passing amount to read if forwarding to slave
 			if (module_id == 0x00){
 				uartResp->command = cmd->command;
 				uartResp->addr = cmd->addr;
 				uartResp->reserved = cmd->reserved;
-				uartResp->data_len = sizeof(FIRMWARE_VERSION_DATA);
-				uartResp->data = FIRMWARE_VERSION_DATA;
+				uartResp->data_len = strlen(FW_VERSION_STRING);
+				uartResp->data = (uint8_t*)FW_VERSION_STRING;
 			} else {
 				process_i2c_forward(uartResp, cmd, module_id);
 			}
 			break;
 		case OW_CMD_ECHO:
-			// exact copy
-			uartResp->id = cmd->id;
-			uartResp->command = cmd->command;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
-			uartResp->data_len = cmd->data_len;
-			uartResp->data = cmd->data;
+			if (module_id == 0x00){
+				// exact copy
+				uartResp->id = cmd->id;
+				uartResp->command = cmd->command;
+				uartResp->addr = cmd->addr;
+				uartResp->reserved = cmd->reserved;
+				uartResp->data_len = cmd->data_len;
+				uartResp->data = cmd->data;
+			} else {
+				process_i2c_forward(uartResp, cmd, module_id);
+			}
 			break;
 		case OW_CMD_TOGGLE_LED:
-			module_id = ModuleManager_GetModuleIndex(cmd->addr);
 			if (module_id == 0x00)
 			{
 				uartResp->data_len = 0;
@@ -311,7 +417,6 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			}
 			break;
 		case OW_CMD_HWID:
-			module_id = ModuleManager_GetModuleIndex(cmd->addr);
 			cmd->data_len = HW_ID_DATA_LENGTH; //passing amount to read if forwarding to slave
 			if (module_id == 0x00)
 			{
@@ -329,23 +434,19 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			}
 			break;
 		case OW_CMD_GET_TEMP:
-			module_id = ModuleManager_GetModuleIndex(cmd->addr);
 			cmd->data_len = TEMPERATURE_DATA_LENGTH; //passing amount to read if forwarding to slave
 			if (module_id == 0){
 				uartResp->id = cmd->id;
 				uartResp->command = cmd->command;
 				uartResp->data_len = TEMPERATURE_DATA_LENGTH;
-				tx_temperature = Thermistor_ReadTemperature();
 				uartResp->data = (uint8_t *)&tx_temperature;
 			}else{
 				process_i2c_forward(uartResp, cmd, module_id);
 			}
 			break;
 		case OW_CMD_GET_AMBIENT:
-			module_id = ModuleManager_GetModuleIndex(cmd->addr);
 			cmd->data_len = TEMPERATURE_DATA_LENGTH; //passing amount to read if forwarding to slave
 			if (module_id == 0){
-				ambient_temperature = MAX31875_ReadTemperature();
 				uartResp->id = cmd->id;
 				uartResp->command = cmd->command;
 				uartResp->data_len = TEMPERATURE_DATA_LENGTH;
@@ -379,6 +480,13 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			uartResp->addr = cmd->addr;
 			uartResp->reserved = cmd->reserved;
 			uartResp->data_len = 0;
+			
+			if (module_id != 0){
+				// trigger is only on master
+				uartResp->packet_type = OW_ERROR;
+				uartResp->data = NULL;
+				break;
+			}
 
 			if(!set_trigger_data((char *)cmd->data, cmd->data_len))
 			{
@@ -397,24 +505,103 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			break;
 		case OW_CTRL_GET_SWTRIG:
 			// refresh state
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+			uartResp->reserved = cmd->reserved;
+			
+			if (module_id != 0){
+				// trigger is only on master
+				uartResp->packet_type = OW_ERROR;
+				uartResp->data = NULL;
+				break;
+			}
+
 			if(!get_trigger_data(retTriggerJson, 0xFF))
 			{
 				uartResp->packet_type = OW_ERROR;
 				break;
 			}
-			uartResp->command = cmd->command;
-			uartResp->addr = cmd->addr;
-			uartResp->reserved = cmd->reserved;
+
 			uartResp->data_len = strlen(retTriggerJson);
 			uartResp->data = (uint8_t *)retTriggerJson;
 			break;
+		case OW_CTRL_GET_MODULE_COUNT:
+			uartResp->command = cmd->command;
+			uartResp->addr = cmd->addr;
+
+			if (module_id == 0){
+				module_count = get_module_count();
+				uartResp->data_len = 1;
+				uartResp->data = (uint8_t *)&module_count;
+			}else{
+                uartResp->packet_type = OW_ERROR;
+                uartResp->data_len = 0;
+                uartResp->data = NULL;				
+			}
+			break;
+        case OW_CMD_USR_CFG:
+			if (module_id != 0x00)
+			{
+				process_i2c_forward(uartResp, cmd, module_id);
+				return;
+			}
+            // reserved == 0: READ
+            // reserved == 1: WRITE (cmd->data is JSON text)
+            if (cmd->reserved == 0) {
+                const uint8_t *wire_buf = NULL;
+                uint16_t wire_len = 0;
+                const uint16_t max_payload = (uint16_t)(DATA_MAX_SIZE);
+                if (lifu_cfg_wire_read(&wire_buf, &wire_len, max_payload) != HAL_OK || wire_buf == NULL) {
+                    uartResp->packet_type = OW_ERROR;
+                    uartResp->data_len = 0;
+                    uartResp->data = NULL;
+                    break;
+                }
+
+                uartResp->data_len = wire_len;
+                uartResp->data = (uint8_t *)wire_buf;
+            }
+            else if (cmd->reserved == 1) {
+                if (cmd->data == NULL || cmd->data_len == 0) {
+                    uartResp->packet_type = OW_ERROR;
+                    uartResp->data_len = 0;
+                    uartResp->data = NULL;
+                    break;
+                }
+
+                if (lifu_cfg_wire_write(cmd->data, cmd->data_len) != HAL_OK) {
+                    uartResp->packet_type = OW_ERROR;
+                    uartResp->data_len = 0;
+                    uartResp->data = NULL;
+                    break;
+                }
+
+                // Return the updated header as an ACK payload.
+                const uint8_t *wire_buf = NULL;
+                uint16_t wire_len = 0;
+                const uint16_t max_payload = (uint16_t)(DATA_MAX_SIZE);
+                if (lifu_cfg_wire_read(&wire_buf, &wire_len, max_payload) != HAL_OK || wire_buf == NULL) {
+                    uartResp->packet_type = OW_ERROR;
+                    uartResp->data_len = 0;
+                    uartResp->data = NULL;
+                    break;
+                }
+                uartResp->data_len = (uint16_t)sizeof(lifu_cfg_wire_hdr_t);
+                uartResp->data = (uint8_t *)wire_buf;
+            }
+            else {
+                uartResp->packet_type = OW_ERROR;
+                uartResp->data_len = 0;
+                uartResp->data = NULL;
+            }
+            break;
 		case OW_CMD_RESET:
-			module_id = ModuleManager_GetModuleIndex(cmd->addr);
 			if (module_id == 0x00){
 				uartResp->command = cmd->command;
 				uartResp->addr = cmd->addr;
 				uartResp->reserved = cmd->reserved;
 				uartResp->data_len = 0;
+
 
 				__HAL_TIM_CLEAR_FLAG(&htim17, TIM_FLAG_UPDATE);
 				__HAL_TIM_SET_COUNTER(&htim17, 0);
@@ -426,7 +613,6 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			}
 			break;
 		case OW_CMD_DFU:
-			module_id = ModuleManager_GetModuleIndex(cmd->addr);
 			if (module_id == 0x00){
 				uartResp->command = cmd->command;
 				uartResp->addr = cmd->addr;
@@ -434,6 +620,8 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 				uartResp->data_len = 0;
 
 				_enter_dfu = true;
+				_force_stm32_dfu = cmd->reserved == 0x77? true : false; // force to enter STM32 DFU bootloader instead of custom DFU mode for testing purposes
+
 
 				__HAL_TIM_CLEAR_FLAG(&htim17, TIM_FLAG_UPDATE);
 				__HAL_TIM_SET_COUNTER(&htim17, 0);
@@ -447,6 +635,14 @@ static void CONTROLLER_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 		case OW_CMD_ASYNC:
 			uartResp->command = cmd->command;
 			uartResp->addr = cmd->addr;
+			
+			if (module_id != 0){
+				// trigger is only on master
+				uartResp->packet_type = OW_ERROR;
+				uartResp->data = NULL;
+				break;
+			}
+			
 			if(cmd->data_len == 1){
 				async_enabled = cmd->data[0] == 1? true: false;
 			}
@@ -468,7 +664,7 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 	uint8_t module_id = 0;
 	uint16_t reg_address = 0;
 	uint32_t reg_value = 0;
-	uint32_t reg_data_buff[REG_DATA_LEN] = {0};
+	static uint32_t reg_data_buff[REG_DATA_LEN];
 	int reg_count = 0;
 
 	uartResp->id = cmd->id;
@@ -485,22 +681,6 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 		uartResp->reserved = (uint8_t)get_tx_chip_count();
 		uartResp->data_len = 0;
 		uartResp->data = NULL;
-		break;
-	case OW_TX7332_DEMO:
-		uartResp->command = OW_TX7332_DEMO;
-		uartResp->data_len = 0;
-		uartResp->data = NULL;
-		uartResp->addr = cmd->addr;
-		module_id = ModuleManager_GetModuleIndex(cmd->addr);
-
-		if(module_id == 0x00) // local
-		{
-			write_demo_registers(&transmitters[cmd->addr]);
-	    }else{
-			process_i2c_forward(uartResp, cmd, module_id);
-		}
-
-		uartResp->reserved = (uint8_t)get_tx_chip_count();
 		break;
 	case OW_TX7332_WREG:
 		uartResp->command = OW_TX7332_WREG;
@@ -671,13 +851,50 @@ static void TX7332_ProcessCommand(UartPacket *uartResp, UartPacket* cmd)
 			process_i2c_forward(uartResp, cmd, module_id);
 		}
 		break;
+	case OW_TX7332_RBLOCK:
+		uartResp->command = OW_TX7332_RBLOCK;
+		uartResp->addr = cmd->addr;
+		uartResp->reserved = 0;
+		uartResp->data_len = 0;
+		uartResp->data = NULL;
+		/* Request payload: uint16_t start_addr, uint8_t count, uint8_t reserved */
+		if(cmd->data_len != 4 || cmd->addr >= get_tx_chip_count()){
+			uartResp->packet_type = OW_ERROR;
+			break;
+		}
+
+		module_id = ModuleManager_GetModuleIndex(cmd->addr);
+
+		if(module_id == 0x00) // local
+		{
+			reg_address = cmd->data[0] | (cmd->data[1] << 8);
+			reg_count   = cmd->data[2];
+			if(reg_count == 0 || reg_count > REG_DATA_LEN){
+				uartResp->packet_type = OW_ERROR;
+				break;
+			}
+
+			memset(reg_data_buff, 0, REG_DATA_LEN * sizeof(uint32_t));
+			for(int i = 0; i < reg_count; i++){
+				reg_data_buff[i] = TX7332_ReadReg(&transmitters[cmd->addr], reg_address + i);
+			}
+
+			uartResp->data_len = (uint16_t)(reg_count * sizeof(uint32_t));
+			uartResp->data = (uint8_t*)reg_data_buff;
+		}else{
+			process_i2c_forward(uartResp, cmd, module_id);
+		}
+		break;
 	case OW_TX7332_DEVICE_COUNT:
-		uint8_t temp_module_count = get_module_count();
+	{
+		static uint8_t temp_module_count;
+		temp_module_count = get_module_count();
 		uartResp->command = OW_TX7332_DEVICE_COUNT;
 		uartResp->addr = 0;
 		uartResp->reserved = 0;
 		uartResp->data = &temp_module_count;
 		uartResp->data_len = 1;
+	}
 		break;
 	case OW_TX7332_RESET:
 		uartResp->command = OW_TX7332_RESET;
@@ -722,6 +939,49 @@ bool process_if_command(UartPacket *cmd, UartPacket *resp)
 	case OW_TX7332:
 		TX7332_ProcessCommand(resp, cmd);
 		break;
+	case OW_I2C_PASSTHRU:
+	{
+		/* Raw I2C passthrough: forward bytes to an I2C slave (typically the
+		 * DFU bootloader at 0x72) and optionally read back bytes.
+		 *
+		 * cmd->addr     = 7-bit I2C slave address
+		 * cmd->command  = 0x00  write-only
+		 *                 0x01  write then delay 5ms then read
+		 * cmd->reserved = number of bytes to read back (command=0x01 only, max 255)
+		 * cmd->data     = bytes to write (may be empty for a read-only op)
+		 */
+		static uint8_t i2c_passthru_rx[256];
+		uint8_t i2c_addr = cmd->addr;
+		uint8_t do_read  = (cmd->command == 0x01);
+		uint8_t rx_count = cmd->reserved;
+
+		resp->command   = cmd->command;
+		resp->addr      = cmd->addr;
+		resp->reserved  = 0;
+		resp->data_len  = 0;
+		resp->data      = NULL;
+
+		/* Write phase (skip if no data) */
+		if (cmd->data_len > 0) {
+			if (send_buffer_to_slave_global(i2c_addr, cmd->data, cmd->data_len) != 0) {
+				resp->packet_type = OW_ERROR;
+				break;
+			}
+		}
+
+		/* Optional read phase */
+		if (do_read && rx_count > 0) {
+			HAL_Delay(5); /* brief gap between write and read */
+			memset(i2c_passthru_rx, 0, sizeof(i2c_passthru_rx));
+			if (read_raw_from_slave_global(i2c_addr, i2c_passthru_rx, rx_count) != 0) {
+				resp->packet_type = OW_ERROR;
+				break;
+			}
+			resp->data_len = rx_count;
+			resp->data     = i2c_passthru_rx;
+		}
+		break;
+	}
 	default:
 		resp->data_len = 0;
 		resp->reserved = OW_UNKNOWN_ERROR;

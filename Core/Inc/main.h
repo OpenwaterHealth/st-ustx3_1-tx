@@ -76,8 +76,6 @@ void set_reconfigure();
 #define TR3_EN_GPIO_Port GPIOB
 #define SYSTEM_RDY_Pin GPIO_PIN_2
 #define SYSTEM_RDY_GPIO_Port GPIOD
-#define TX1_SHUTZ_Pin GPIO_PIN_11
-#define TX1_SHUTZ_GPIO_Port GPIOC
 #define CALL_OUT_Pin GPIO_PIN_10
 #define CALL_OUT_GPIO_Port GPIOC
 #define LOCAL_SDA_Pin GPIO_PIN_7

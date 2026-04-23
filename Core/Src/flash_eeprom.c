@@ -8,16 +8,16 @@
 #include "flash_eeprom.h"
 
 /* Function to write data to Flash */
-HAL_StatusTypeDef Flash_Write(uint32_t address, uint32_t* data, uint32_t size) {
+HAL_StatusTypeDef Flash_Write(uint32_t address, const void *src, uint32_t size_bytes){
     HAL_StatusTypeDef status = HAL_OK;
-
+    uint8_t * data = (uint8_t *)src;
     status = HAL_FLASH_Unlock();
     if(status != HAL_OK){
     	return status;
     }
 
 
-    for (uint32_t i = 0; i < size; i++) {
+    for (uint32_t i = 0; i < size_bytes; i++) {
         status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address + (i * sizeof(uint32_t)), data[i]);
         if (status != HAL_OK) {
             break;
@@ -29,8 +29,9 @@ HAL_StatusTypeDef Flash_Write(uint32_t address, uint32_t* data, uint32_t size) {
 }
 
 /* Function to read data from Flash */
-HAL_StatusTypeDef Flash_Read(uint32_t address, uint32_t* data, uint32_t size) {
-    for (uint32_t i = 0; i < size; i++) {
+HAL_StatusTypeDef Flash_Read(uint32_t address, void *dst, uint32_t size_bytes) {
+    uint8_t * data = (uint8_t *)dst;
+    for (uint32_t i = 0; i < size_bytes; i++) {
         data[i] = *(__IO uint32_t*)(address + (i * sizeof(uint32_t)));
     }
     return HAL_OK;

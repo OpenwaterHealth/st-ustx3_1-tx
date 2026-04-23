@@ -23,9 +23,15 @@ void Thermistor_Start(ADC_HandleTypeDef *hadc, float vRef, float rPullUp)
     referenceVoltage = vRef;
     pullUpResistance = rPullUp;
 
+    __HAL_ADC_CLEAR_FLAG(adcHandle, ADC_FLAG_OVR | ADC_FLAG_EOC | ADC_FLAG_EOS);
+
     // Start the ADC in continuous mode
     HAL_ADC_Start(adcHandle);
-    // HAL_TIM_Base_Start_IT(&TEMPERATURE_TIMER);  // Start the timer for periodic temperature reading
+
+    // throw away first sample; ADCs often have a "warm-up" code
+    (void)HAL_ADC_PollForConversion(adcHandle, 5);
+    (void)HAL_ADC_GetValue(adcHandle);
+
 }
 
 void Thermistor_Stop()
@@ -40,6 +46,15 @@ void Thermistor_Stop()
 // Read thermistor resistance
 static float Thermistor_GetResistance(void)
 {
+
+    // With AutoWait ENABLE, ADC won’t start the next conversion until DR is read.
+    // With Overrun=OVERWRITTEN, you’ll never get “stuck” on old data.
+    if (HAL_ADC_PollForConversion(adcHandle, 5) != HAL_OK) {
+        // If you ever suspect OVR, clear it:
+        __HAL_ADC_CLEAR_FLAG(adcHandle, ADC_FLAG_OVR);
+        return false;
+    }
+
     // Get ADC value
     uint16_t adcValue = HAL_ADC_GetValue(adcHandle);
 
@@ -63,10 +78,4 @@ float Thermistor_ReadTemperature(void)
     }
 
     return 0;
-}
-
-void TEMP_TIM7_IRQHandler(void)
-{
-    tx_temperature = Thermistor_ReadTemperature();
-    ambient_temperature = MAX31875_ReadTemperature();
 }

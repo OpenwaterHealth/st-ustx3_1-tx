@@ -1,7 +1,5 @@
 #include "trigger.h"
-#include "stm32f0xx_hal.h"
 #include "main.h"
-#include "thermistor.h"
 
  #include "jsmn.h"
 
@@ -176,7 +174,7 @@ static void Configure_ONESHOT_Timer(TIM_HandleTypeDef* htim, uint16_t pulsewidth
 	  htim->Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	  htim->Init.RepetitionCounter = 0;
 	  htim->Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-	  if (HAL_TIM_Base_Init(&TRIGGER_TIMER) != HAL_OK)
+	  if (HAL_TIM_Base_Init(htim) != HAL_OK)
 	  {
 	    Error_Handler();
 	  }
@@ -194,7 +192,7 @@ static void Configure_ONESHOT_Timer(TIM_HandleTypeDef* htim, uint16_t pulsewidth
 	    Error_Handler();
 	  }
 	  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_TRIGGER;
-	  sSlaveConfig.InputTrigger = TIM_TS_ITR1;
+	  sSlaveConfig.InputTrigger = TIM_TS_ITR0;
 	  if (HAL_TIM_SlaveConfigSynchro(htim, &sSlaveConfig) != HAL_OK)
 	  {
 	    Error_Handler();
@@ -379,9 +377,9 @@ uint8_t start_trigger_pulse(void) {
         return TRIGGER_STATUS_ERROR;
     }
 
-    // Validate: Pulse train interval must be 0 or greater than the period
+    // Validate: Pulse train interval must be 0 or large enough to contain the full pulse train
     if (_timerDataConfig.TriggerPulseTrainInterval > 0 &&
-        _timerDataConfig.TriggerPulseTrainInterval <= (triggerPeriodUsec * _timerDataConfig.TriggerPulseTrainCount)) {
+        _timerDataConfig.TriggerPulseTrainInterval < triggerPeriodUsec * _timerDataConfig.TriggerPulseCount) {
         _timerDataConfig.TriggerStatus = TRIGGER_STATUS_ERROR;
         return TRIGGER_STATUS_ERROR;
     }
@@ -412,13 +410,10 @@ uint8_t start_trigger_pulse(void) {
     // Start PWM
     HAL_TIM_PWM_Start(&TRIGGER_TIMER, TIM_CHANNEL_2);
     HAL_TIM_Base_Start_IT(&LORES_TIMER);
-	HAL_TIM_Base_Start_IT(&TEMPERATURE_TIMER);
-	if(_timerDataConfig.TriggerPulseTrainInterval>0) {
-		// Re-enable interrupts
-		__HAL_TIM_ENABLE_IT(&HIRES_TIMER, TIM_IT_UPDATE);
-		// Start PWM
-		HAL_TIM_Base_Start_IT(&HIRES_TIMER);
-	}
+    if(_timerDataConfig.TriggerPulseTrainInterval>0) {
+        __HAL_TIM_ENABLE_IT(&HIRES_TIMER, TIM_IT_UPDATE);
+        HAL_TIM_Base_Start_IT(&HIRES_TIMER);
+    }
     _timerDataConfig.TriggerStatus = TRIGGER_STATUS_RUNNING;
     return TRIGGER_STATUS_RUNNING;
 }
@@ -429,7 +424,6 @@ uint8_t stop_trigger_pulse(void) {
     HAL_TIM_PWM_Stop(&TRIGGER_TIMER, TIM_CHANNEL_2);
     HAL_TIM_Base_Stop_IT(&LORES_TIMER);
     HAL_TIM_Base_Stop_IT(&HIRES_TIMER);
-	HAL_TIM_Base_Stop_IT(&TEMPERATURE_TIMER);
     _timerDataConfig.TriggerStatus = TRIGGER_STATUS_READY;
     return TRIGGER_STATUS_READY;
 }
@@ -456,16 +450,15 @@ void TRIG_TIM2_IRQHandler(void) {
 	    HAL_TIM_PWM_Start(&TRIGGER_TIMER, TIM_CHANNEL_2);
 	    __HAL_TIM_ENABLE_IT(&LORES_TIMER, TIM_IT_UPDATE);
 	    HAL_TIM_Base_Start_IT(&LORES_TIMER);
-		if(_timerDataConfig.TriggerPulseTrainInterval>0) {
-			// Re-enable interrupts
-			__HAL_TIM_ENABLE_IT(&HIRES_TIMER, TIM_IT_UPDATE);
-			// Start PWM
-			HAL_TIM_Base_Start_IT(&HIRES_TIMER);
-		}
+
+        if(_timerDataConfig.TriggerPulseTrainInterval>0) {
+            __HAL_TIM_ENABLE_IT(&HIRES_TIMER, TIM_IT_UPDATE);
+            HAL_TIM_Base_Start_IT(&HIRES_TIMER);
+        }
 	}
 }
 
-void TRIG_TIM3_IRQHandler(void) {
+void TRIG_TIM1_IRQHandler(void) {
 	if(_timerDataConfig.TriggerStatus != TRIGGER_STATUS_RUNNING) return;
 
     _pulseCount++;
@@ -478,7 +471,7 @@ void TRIG_TIM3_IRQHandler(void) {
 
         __HAL_TIM_DISABLE_IT(&LORES_TIMER, TIM_IT_UPDATE);
         HAL_TIM_Base_Stop_IT(&LORES_TIMER);
-        if(_timerDataConfig.TriggerPulseTrainInterval==0) {
+        if(_timerDataConfig.TriggerPulseTrainInterval == 0) {
 			_trainCount++;
         	if(_timerDataConfig.TriggerMode == TRIGGER_MODE_SINGLE)
         	{
@@ -486,12 +479,19 @@ void TRIG_TIM3_IRQHandler(void) {
 		        sequence_complete_callback(_timerDataConfig.TriggerPulseTrainCount );
         		return;
         	} else {
+				if (_timerDataConfig.TriggerMode == TRIGGER_MODE_SEQUENCE &&
+					_trainCount >= _timerDataConfig.TriggerPulseTrainCount) {
+					stop_trigger_pulse();
+					sequence_complete_callback(_timerDataConfig.TriggerPulseTrainCount);
+					return;
+				}
 				HAL_TIM_PWM_Stop(&TRIGGER_TIMER, TIM_CHANNEL_2);
 				_pulseCount = 0;
 				HAL_TIM_PWM_Start(&TRIGGER_TIMER, TIM_CHANNEL_2);
 				__HAL_TIM_ENABLE_IT(&LORES_TIMER, TIM_IT_UPDATE);
 				HAL_TIM_Base_Start_IT(&LORES_TIMER);
 				pulsetrain_complete_callback(_trainCount, _timerDataConfig.TriggerPulseTrainCount);
+				return;
         	}
     	}
     }
